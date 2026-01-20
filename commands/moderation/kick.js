@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -12,11 +12,11 @@ module.exports = {
         const reason = interaction.options.getString('reason') || 'No reason provided';
 
         if (!target) {
-            return interaction.reply({ content: 'Member not found.', ephemeral: true });
+            return interaction.reply({ content: 'Member not found.', flags: MessageFlags.Ephemeral });
         }
 
         if (!target.kickable) {
-            return interaction.reply({ content: 'I cannot kick this user. Check my role hierarchy.', ephemeral: true });
+            return interaction.reply({ content: 'I cannot kick this user. Check my role hierarchy.', flags: MessageFlags.Ephemeral });
         }
 
         await target.kick(reason);

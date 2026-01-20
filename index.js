@@ -3,6 +3,14 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
+// Add ffmpeg to PATH
+const ffmpegStatic = require('ffmpeg-static');
+if (ffmpegStatic) {
+    const ffmpegDir = path.dirname(ffmpegStatic);
+    process.env.PATH = `${ffmpegDir}${path.delimiter}${process.env.PATH}`;
+    console.log(`[System] Added ffmpeg to PATH: ${ffmpegDir}`);
+}
+
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -54,6 +62,10 @@ if (fs.existsSync(eventsPath)) {
         }
     }
 }
+
+// Init TTS
+const { init } = require('./utils/ttsProvider');
+init();
 
 // Deploy Commands
 const rest = new REST().setToken(process.env.DISCORD_TOKEN);

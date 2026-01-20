@@ -1,4 +1,4 @@
-const { Events } = require('discord.js');
+const { Events, MessageFlags } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
@@ -23,17 +23,17 @@ module.exports = {
 
         const role = interaction.guild.roles.cache.get(roleId);
         if (!role) {
-            return interaction.reply({ content: 'Role not found.', ephemeral: true });
+            return interaction.reply({ content: 'Role not found.', flags: MessageFlags.Ephemeral });
         }
 
         const member = interaction.member;
 
         if (member.roles.cache.has(roleId)) {
             await member.roles.remove(role);
-            await interaction.reply({ content: `Removed role ${role.name}`, ephemeral: true });
+            await interaction.reply({ content: `Removed role ${role.name}`, flags: MessageFlags.Ephemeral });
         } else {
             await member.roles.add(role);
-            await interaction.reply({ content: `Added role ${role.name}`, ephemeral: true });
+            await interaction.reply({ content: `Added role ${role.name}`, flags: MessageFlags.Ephemeral });
         }
     },
 };

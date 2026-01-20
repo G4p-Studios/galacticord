@@ -1,9 +1,20 @@
 const { Events, EmbedBuilder } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
+
+const configFile = path.join(__dirname, '../data/server_config.json');
 
 module.exports = {
     name: Events.GuildMemberAdd,
     async execute(member) {
-        const logChannelId = process.env.LOG_CHANNEL_ID;
+        let config = {};
+        try {
+            if (fs.existsSync(configFile)) {
+                config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+            }
+        } catch (e) {}
+
+        const logChannelId = config[member.guild.id]?.logChannel;
         if (!logChannelId) return;
 
         const logChannel = member.guild.channels.cache.get(logChannelId);
