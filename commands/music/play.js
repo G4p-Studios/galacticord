@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, VoiceConnectionStatus } = require('@discordjs/voice');
-const play = require('play-dl');
+const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus } = require('@discordjs/voice');
+const { ensureYtDlp, binaryPath } = require('../../utils/ytDlpHelper');
+const { spawn } = require('child_process');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -18,40 +19,81 @@ module.exports = {
         }
 
         try {
+            const ytDlp = await ensureYtDlp();
+
             const connection = joinVoiceChannel({
                 channelId: channel.id,
                 guildId: interaction.guild.id,
                 adapterCreator: interaction.guild.voiceAdapterCreator,
             });
 
-            let stream;
-            let type;
+            // Get Video Metadata first using the wrapper (it handles JSON parsing well)
+            let videoUrl = query;
+            let videoTitle = "Unknown Song";
 
-            if (query.startsWith('https')) {
-                const yt_info = await play.video_info(query);
-                stream = await play.stream_from_info(yt_info);
+            // If it's not a link, search first
+            if (!query.startsWith('http')) {
+                console.log(`[Music Debug] Searching for: ${query}`);
+                const metadata = await ytDlp.execPromise([
+                    `ytsearch1:${query}`,
+                    '--dump-json',
+                    '--no-playlist'
+                ]);
+                
+                const info = JSON.parse(metadata);
+                videoUrl = info.webpage_url;
+                videoTitle = info.title;
             } else {
-                const yt_info = await play.search(query, { limit: 1 });
-                if (yt_info.length === 0) return interaction.editReply('No results found.');
-                stream = await play.stream(yt_info[0].url);
+                console.log(`[Music Debug] Fetching metadata for: ${query}`);
+                const metadata = await ytDlp.execPromise([
+                    query,
+                    '--dump-json',
+                    '--no-playlist'
+                ]);
+                const info = JSON.parse(metadata);
+                videoTitle = info.title;
+                videoUrl = info.webpage_url; // Normalized URL
             }
 
-            const resource = createAudioResource(stream.stream, { inputType: stream.type });
+            console.log(`[Music Debug] Playing: ${videoTitle} (${videoUrl})`);
+
+            // Spawn the process natively to get the raw stdout stream
+            // This bypasses the wrapper's stream handling which was causing the "undefined" error
+            const args = [
+                videoUrl,
+                '-o', '-',
+                '-f', 'bestaudio',
+                '--no-playlist',
+                '--retry', '3'
+            ];
+
+            const child = spawn(binaryPath, args);
+
+            const resource = createAudioResource(child.stdout);
             const player = createAudioPlayer();
 
             player.play(resource);
             connection.subscribe(player);
 
-            player.on(AudioPlayerStatus.Idle, () => {
-                // simple auto-disconnect on finish for now
-                // connection.destroy(); 
+            player.on('error', error => {
+                console.error(`[AudioPlayer Error]`, error);
+                interaction.followUp({ content: 'Playback error occurred.', ephemeral: true });
+            });
+            
+            child.on('error', error => {
+                console.error(`[yt-dlp Process Error]`, error);
             });
 
-            await interaction.editReply(`Now playing: **${query}**`);
+            child.stderr.on('data', data => {
+                // Uncomment to see yt-dlp internal logs
+                // console.log(`[yt-dlp stderr] ${data}`);
+            });
+
+            await interaction.editReply(`Now playing: **${videoTitle}**`);
 
         } catch (error) {
-            console.error(error);
-            await interaction.editReply('Failed to play music. Make sure ffmpeg is installed.');
+            console.error('[Music Command Error]', error);
+            await interaction.editReply(`Failed to play music: ${error.message}`);
         }
     },
 };

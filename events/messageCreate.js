@@ -70,6 +70,15 @@ module.exports = {
                         guildId: message.guild.id,
                         adapterCreator: message.guild.voiceAdapterCreator,
                     });
+                    
+                    connection.on('stateChange', (oldState, newState) => {
+                        console.log(`[VoiceConnection AutoJoin] State changed from ${oldState.status} to ${newState.status}`);
+                    });
+        
+                    connection.on('error', (error) => {
+                        console.error(`[VoiceConnection AutoJoin Error] ${error.message}`);
+                        // Don't destroy immediately in auto-join, it might recover
+                    });
                 } catch (error) {
                     console.error("Failed to auto-join VC:", error);
                     return;
