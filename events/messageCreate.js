@@ -13,7 +13,22 @@ module.exports = {
         // We keep this one for basic entry check
         // console.log(`[MessageCreate Debug] Received message from ${message.author.tag} in #${message.channel.name}`);
         
-        if (!message.guild) return;
+        if (!message.guild || message.author.bot) return;
+
+        // Prefix command handling
+        const prefix = 'mal!';
+        if (message.content.startsWith(prefix)) {
+            const args = message.content.slice(prefix.length).trim().split(/ +/);
+            const commandName = args.shift().toLowerCase();
+
+            if (commandName === 'ping') {
+                const start = Date.now();
+                const sent = await message.reply('Pinging...');
+                const end = Date.now();
+                const latency = end - start;
+                return sent.edit(`Pong! Latency: ${latency}ms (API Latency: ${Math.round(message.client.ws.ping)}ms)`);
+            }
+        }
 
         // Load Server Config
         let config = {};
