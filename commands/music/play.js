@@ -109,15 +109,16 @@ async function playNext(guildId, client) {
         const args = [
             song.url,
             '-o', '-',
-            // Force the best audio format and extract it as mp3 for maximum compatibility
-            '-f', 'bestaudio/best',
+            // Broadest possible audio selection
+            '-f', 'ba/b',
             '--extract-audio',
             '--audio-format', 'mp3',
             '--no-playlist',
             '--force-ipv4',
             '--no-check-certificates',
             '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            '--referer', 'https://www.youtube.com/'
+            '--referer', 'https://www.youtube.com/',
+            '--ffmpeg-location', process.env.FFMPEG_PATH || 'ffmpeg'
         ];
 
         // Check for cookies.txt in the data folder
