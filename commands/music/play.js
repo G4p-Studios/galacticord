@@ -33,26 +33,26 @@ module.exports = {
             const cookiesPath = path.resolve(process.cwd(), 'data', 'cookies.txt');
             const cachePath = path.resolve(process.cwd(), 'data', '.cache');
             
-            // Ensure cache directory exists
             if (!fs.existsSync(cachePath)) fs.mkdirSync(cachePath, { recursive: true });
 
-            // We try multiple ways to get a JS runtime working on Linux VPS
             const commonArgs = [
-                '--js-runtimes', 'node', 
+                '--js-runtimes', 'node',
                 '--cache-dir', cachePath,
                 '--no-check-certificates',
-                '--ignore-config',
-                '--no-warnings'
+                '--no-warnings',
+                '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                '--extractor-args', 'youtube:player_client=android,web'
             ];
             
             if (fs.existsSync(cookiesPath)) {
                 console.log(`[Music Debug] SUCCESS: Found cookies.txt at: ${cookiesPath}`);
                 commonArgs.push('--cookies', cookiesPath);
             } else {
-                console.log(`[Music Debug] WARNING: No cookies.txt found at: ${cookiesPath}`);
+                console.log(`[Music Debug] WARNING: No cookies.txt found at: ${cookiesPath}. Bot check may fail.`);
+                console.log(`[Music Debug] CWD: ${process.cwd()}`);
             }
 
-            console.log(`[Music Debug] Using args: ${commonArgs.join(' ')}`);
+            console.log(`[Music Debug] Executing yt-dlp with cookie support and JS runtime.`);
 
             // Get Video Metadata
             let videoUrl = query;

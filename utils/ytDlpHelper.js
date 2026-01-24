@@ -12,6 +12,7 @@ async function ensureYtDlp() {
         await YTDlpWrap.downloadFromGithub(binaryPath);
         console.log('[System] yt-dlp downloaded successfully.');
     }
+    // We can add a check here to update if needed
     return new YTDlpWrap(binaryPath);
 }
 
