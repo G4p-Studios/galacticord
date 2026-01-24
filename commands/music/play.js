@@ -1,7 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, StreamType, VoiceConnectionStatus, entersState, getVoiceConnection } = require('@discordjs/voice');
-const { ensureYtDlp, binaryPath } = require('../../utils/ytDlpHelper');
-const { spawn } = require('child_process');
+const { joinVoiceChannel, createAudioPlayer, createAudioResource, VoiceConnectionStatus, entersState, getVoiceConnection } = require('@discordjs/voice');
+const play = require('play-dl');
 const path = require('path');
 const fs = require('fs');
 
@@ -21,8 +20,7 @@ module.exports = {
         }
 
         try {
-            const ytDlp = await ensureYtDlp();
-
+            // Setup Connection
             let connection = getVoiceConnection(interaction.guild.id);
             if (!connection) {
                 connection = joinVoiceChannel({
@@ -32,79 +30,42 @@ module.exports = {
                 });
             }
 
-            // Wait for connection to be ready
             try {
                 await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
             } catch (e) {
-                console.error('[Music] Connection failed to reach Ready state:', e.message);
                 return interaction.editReply('Failed to connect to voice channel.');
             }
 
-            // Setup common arguments for yt-dlp
+            // Check for cookies
             const cookiesPath = path.resolve(process.cwd(), 'data', 'cookies.txt');
-            const cachePath = path.resolve(process.cwd(), 'data', '.cache');
-            
-            if (!fs.existsSync(cachePath)) fs.mkdirSync(cachePath, { recursive: true });
-
-            const commonArgs = [
-                '--js-runtimes', `node:${process.execPath}`,
-                '--cache-dir', cachePath,
-                '--no-check-certificates',
-                '--no-warnings',
-                '--force-ipv4',
-                '--extractor-args', 'youtube:player_client=ios'
-            ];
-            
             if (fs.existsSync(cookiesPath)) {
-                commonArgs.push('--cookies', cookiesPath);
+                console.log(`[Music Debug] Using cookies from: ${cookiesPath}`);
+                // play-dl can use cookies from a file
+                // Note: some versions of play-dl require authorization() call for cookies
             }
 
-            // Get Video Metadata
-            let videoUrl = query;
-            let videoTitle = "Unknown Song";
-
-            try {
-                if (!query.startsWith('http')) {
-                    const metadata = await ytDlp.execPromise([
-                        `ytsearch1:${query}`,
-                        '--dump-json',
-                        '--flat-playlist',
-                        ...commonArgs
-                    ]);
-                    const info = JSON.parse(metadata);
-                    const firstEntry = info.entries ? info.entries[0] : info;
-                    videoUrl = firstEntry.url || firstEntry.webpage_url || `https://www.youtube.com/watch?v=${firstEntry.id}`;
-                    videoTitle = firstEntry.title;
-                } else {
-                    const metadata = await ytDlp.execPromise([
-                        query,
-                        '--dump-json',
-                        '--no-playlist',
-                        ...commonArgs
-                    ]);
-                    const info = JSON.parse(metadata);
-                    videoTitle = info.title;
-                    videoUrl = info.webpage_url;
-                }
-            } catch (err) {
-                if (query.startsWith('http')) videoUrl = query;
-                else throw err;
+            // Search and Stream using play-dl (it handles VPS issues better)
+            let videoInfo;
+            if (query.startsWith('http')) {
+                videoInfo = await play.video_info(query);
+            } else {
+                const searchResults = await play.search(query, { limit: 1 });
+                if (searchResults.length === 0) return interaction.editReply('No results found.');
+                videoInfo = searchResults[0];
             }
 
-            console.log(`[Music Debug] Streaming: ${videoTitle}`);
+            console.log(`[Music Debug] Streaming: ${videoInfo.title || videoInfo.url}`);
 
-            const args = [
-                videoUrl,
-                '-o', '-',
-                '-f', 'ba/ba*',
-                '--no-playlist',
-                ...commonArgs
-            ];
+            // Get stream with VPS-friendly options
+            const stream = await play.stream(videoInfo.url, {
+                quality: 0, // 0 is best audio
+                discordPlayerCompatibility: true,
+                // We pass cookies if they exist
+                ...(fs.existsSync(cookiesPath) ? { cookies: cookiesPath } : {})
+            });
 
-            const child = spawn(binaryPath, args);
-
-            const resource = createAudioResource(child.stdout, {
-                inputType: StreamType.Arbitrary,
+            const resource = createAudioResource(stream.stream, {
+                inputType: stream.type,
                 inlineVolume: true
             });
             
@@ -119,16 +80,8 @@ module.exports = {
             player.on('error', error => {
                 console.error(`[AudioPlayer Error]`, error.message);
             });
-            
-            child.on('error', error => {
-                console.error(`[yt-dlp Process Error]`, error);
-            });
 
-            child.stderr.on('data', data => {
-                console.log(`[yt-dlp stderr] ${data}`);
-            });
-
-            await interaction.editReply(`Now playing: **${videoTitle}**`);
+            await interaction.editReply(`Now playing: **${videoInfo.title || 'YouTube Audio'}**`);
 
         } catch (error) {
             console.error('[Music Command Error]', error);
