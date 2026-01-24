@@ -114,10 +114,9 @@ async function playNext(guildId, client) {
             '--ignore-config',
             '--no-cache-dir',
             '-o', '-',
-            // FIX: Ensure this is lowercase -f for format selection
             '-f', 'ba/ba*',
-            // BYPASS: web_creator is currently the best for 152-18 errors
-            '--extractor-args', 'youtube:player_client=web_creator,android,ios',
+            // BYPASS V3: Use Embedded clients and SKIP standard ones to avoid the 152-18 block
+            '--extractor-args', 'youtube:player_client=web_embedded,android_embedded;player_skip=web,mweb,ios,tv,android',
             '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
             '--referer', 'https://www.youtube.com/'
         ];
@@ -131,7 +130,10 @@ async function playNext(guildId, client) {
             console.log(`[Music Debug] Auth: No cookies.txt found in data folder.`);
         }
 
-        console.log(`[Music Debug] Execution: ${binaryPath} ${musicArgs.join(' ')}`);
+        // Build args for logging - one per line for OCR/Screen Reader clarity
+        console.log("[Music Debug] Command Arguments:");
+        musicArgs.forEach(arg => console.log(`  ${arg}`));
+
         const child = spawn(binaryPath, musicArgs);
 
         let errorBuffer = '';
