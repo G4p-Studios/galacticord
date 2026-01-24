@@ -67,48 +67,29 @@ module.exports = {
                 }
             }
             
-            // Refresh authorization to ensure fresh tokens
-            try {
-                await play.authorization();
-            } catch (authErr) {
-                console.log(`[Music Debug] Auth refresh warning: ${authErr.message}`);
-            }
-
             // Search and Stream using play-dl
-            let videoUrl;
-            let videoTitle;
+            let videoInfo;
 
             if (query.startsWith('http')) {
-                videoUrl = query; // Use the query directly as the URL if it's a link
-                try {
-                    const videoInfo = await play.video_info(query);
-                    // play-dl sometimes puts details inside video_details
-                    videoTitle = videoInfo.video_details?.title || videoInfo.title || "YouTube Video";
-                    console.log(`[Music Debug] Fetched info for direct link. Title: ${videoTitle}`);
-                } catch (e) {
-                    console.log(`[Music Debug] Could not fetch metadata, using URL directly. Error: ${e.message}`);
-                    videoTitle = "YouTube Video";
-                }
+                console.log(`[Music Debug] Fetching info for direct link: ${query}`);
+                videoInfo = await play.video_info(query);
             } else {
                 console.log(`[Music Debug] Searching for: ${query}`);
                 const searchResults = await play.search(query, { limit: 1 });
                 if (!searchResults || searchResults.length === 0) {
                     return interaction.editReply('No results found for your search.');
                 }
-                const firstResult = searchResults[0];
-                videoUrl = firstResult.url;
-                videoTitle = firstResult.title;
-                console.log(`[Music Debug] Search found: ${videoTitle} (${videoUrl})`);
+                videoInfo = searchResults[0];
             }
 
-            if (!videoUrl || videoUrl === 'undefined') {
-                throw new Error("Could not determine a valid video URL.");
-            }
+            const videoUrl = videoInfo.url;
+            const videoTitle = videoInfo.title || videoInfo.video_details?.title || "YouTube Video";
 
             console.log(`[Music Debug] Final decision - Title: ${videoTitle}, URL: ${videoUrl}`);
 
-            // Get stream with VPS-friendly options
-            const stream = await play.stream(videoUrl, {
+            // Get stream using the full videoInfo object instead of just the URL
+            // This is more reliable as it avoids play-dl having to re-fetch metadata
+            const stream = await play.stream(videoInfo, {
                 quality: 0,
                 discordPlayerCompatibility: true
             });
