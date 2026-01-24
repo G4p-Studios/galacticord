@@ -7,6 +7,7 @@ module.exports = {
         .setDescription('Stop music and leave the voice channel'),
     async execute(interaction) {
         const connection = getVoiceConnection(interaction.guild.id);
+        interaction.client.queues.delete(interaction.guild.id);
 
         if (connection) {
             connection.destroy();

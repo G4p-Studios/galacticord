@@ -25,6 +25,7 @@ const client = new Client({
 });
 
 client.commands = new Collection();
+client.queues = new Collection();
 const commands = [];
 
 // Load Commands
