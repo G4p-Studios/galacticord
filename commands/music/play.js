@@ -30,14 +30,18 @@ module.exports = {
             });
 
             // Check for cookies and setup common arguments
-            const cookiesPath = path.join(__dirname, '..', '..', 'data', 'cookies.txt');
-            const commonArgs = ['--js-runtimes', 'node'];
+            // Use process.cwd() to ensure we find the data folder regardless of where the bot is started
+            const cookiesPath = path.resolve(process.cwd(), 'data', 'cookies.txt');
+            
+            // Explicitly tell yt-dlp to use the current Node.js binary as the runtime
+            const commonArgs = ['--js-runtimes', `node:${process.execPath}`];
             
             if (fs.existsSync(cookiesPath)) {
-                console.log(`[Music Debug] Found cookies.txt at: ${cookiesPath}`);
+                console.log(`[Music Debug] SUCCESS: Found cookies.txt at: ${cookiesPath}`);
                 commonArgs.push('--cookies', cookiesPath);
             } else {
-                console.log(`[Music Debug] No cookies.txt found at: ${cookiesPath}`);
+                console.log(`[Music Debug] WARNING: No cookies.txt found at: ${cookiesPath}`);
+                console.log(`[Music Debug] Please ensure your file is at: galacticord/data/cookies.txt`);
             }
 
             // Get Video Metadata first using the wrapper
