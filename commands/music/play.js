@@ -115,9 +115,9 @@ async function playNext(guildId, client) {
             '--no-cache-dir',
             '-o', '-',
             '-f', 'ba/ba*',
-            // BYPASS V3: Use Embedded clients and SKIP standard ones to avoid the 152-18 block
-            '--extractor-args', 'youtube:player_client=web_embedded,android_embedded;player_skip=web,mweb,ios,tv,android',
-            '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            // ANDROID BYPASS: Force only the Android client and skip all blocked clients
+            '--extractor-args', 'youtube:player_client=android;player_skip=web,ios,tv,mweb,web_embedded',
+            '--user-agent', 'com.google.android.youtube/19.29.37 (Linux; U; Android 11; en_US; Pixel 5; Build/RQ3A.210605.005)',
             '--referer', 'https://www.youtube.com/'
         ];
 
@@ -154,14 +154,14 @@ async function playNext(guildId, client) {
             if (code !== 0 && code !== null) {
                 console.error(`[Music Debug] yt-dlp exited with code ${code}. Full Stderr: ${errorBuffer}`);
                 
-                // Diagnostic: Run --list-formats with the EXACT SAME BYPASS ARGS
+                // Diagnostic: Run --list-formats with the EXACT SAME ANDROID BYPASS
                 const diagArgs = [
                     song.url, 
                     '--list-formats', 
                     '--verbose', 
                     '--ignore-config', 
                     '--no-check-certificates',
-                    '--extractor-args', 'youtube:player_client=ios,android_test,tv;player_skip=web,web_embedded,mweb,web_music,android_music'
+                    '--extractor-args', 'youtube:player_client=android;player_skip=web,ios,tv,mweb,web_embedded'
                 ];
                 if (fs.existsSync(cookiePath)) diagArgs.push('--cookies', cookiePath);
                 
