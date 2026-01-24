@@ -1,6 +1,8 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, VoiceConnectionStatus, entersState, getVoiceConnection } = require('@discordjs/voice');
-const play = require('play-dl');
+const { joinVoiceChannel, createAudioPlayer, createAudioResource, VoiceConnectionStatus, entersState, getVoiceConnection, StreamType } = require('@discordjs/voice');
+const { ensureYtDlp, binaryPath } = require('../../utils/ytDlpHelper');
+const { spawn } = require('child_process');
+const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
 
@@ -14,13 +16,15 @@ module.exports = {
 
         const query = interaction.options.getString('query');
         const channel = interaction.member.voice.channel;
+        const apiKey = process.env.YOUTUBE_API_KEY;
 
         if (!channel) {
             return interaction.editReply('You must be in a voice channel to use this command.');
         }
 
         try {
-            // Setup Connection
+            await ensureYtDlp();
+
             let connection = getVoiceConnection(interaction.guild.id);
             if (!connection) {
                 connection = joinVoiceChannel({
@@ -30,71 +34,60 @@ module.exports = {
                 });
             }
 
-            try {
-                await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
-            } catch (e) {
-                return interaction.editReply('Failed to connect to voice channel.');
-            }
+            await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
 
-            // Load cookies and authorize play-dl
-            const cookiesPath = path.resolve(process.cwd(), 'data', 'cookies.txt');
-            if (fs.existsSync(cookiesPath)) {
-                try {
-                    const cookieData = fs.readFileSync(cookiesPath, 'utf8');
-                    const cookieString = cookieData
-                        .split('\n')
-                        .filter(line => line.trim() && !line.startsWith('#'))
-                        .map(line => {
-                            const parts = line.split('\t');
-                            if (parts.length >= 7) {
-                                return `${parts[5]}=${parts[6].trim()}`;
-                            }
-                            return null;
-                        })
-                        .filter(Boolean)
-                        .join('; ');
+            let videoUrl = query;
+            let videoTitle = "Unknown Song";
 
-                    if (cookieString) {
-                        await play.setToken({
-                            youtube: {
-                                cookie: cookieString
-                            }
-                        });
-                        console.log(`[Music Debug] Cookies loaded into play-dl.`);
-                    }
-                } catch (cookieErr) {
-                    console.error(`[Music Debug] Cookie loading error:`, cookieErr.message);
+            // If it's not a link, use YouTube API to search
+            if (!query.startsWith('http')) {
+                if (!apiKey) {
+                    return interaction.editReply('Searching requires a YOUTUBE_API_KEY in the .env file.');
                 }
-            }
-            
-            // Search and Stream using play-dl
-            let videoInfo;
 
-            if (query.startsWith('http')) {
-                console.log(`[Music Debug] Fetching info for direct link: ${query}`);
-                videoInfo = await play.video_info(query);
+                console.log(`[Music Debug] API Search for: ${query}`);
+                const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&key=${apiKey}&maxResults=1&type=video`;
+                const response = await axios.get(searchUrl);
+
+                if (response.data.items.length === 0) {
+                    return interaction.editReply('No results found.');
+                }
+
+                const item = response.data.items[0];
+                videoUrl = `https://www.youtube.com/watch?v=${item.id.videoId}`;
+                videoTitle = item.snippet.title;
             } else {
-                console.log(`[Music Debug] Searching for: ${query}`);
-                const searchResults = await play.search(query, { limit: 1 });
-                if (!searchResults || searchResults.length === 0) {
-                    return interaction.editReply('No results found for your search.');
+                // If it IS a link, try to get the title via API (optional but cleaner)
+                if (apiKey) {
+                    const videoId = query.split('v=')[1]?.split('&')[0];
+                    if (videoId) {
+                        const infoUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${apiKey}`;
+                        const infoRes = await axios.get(infoUrl);
+                        if (infoRes.data.items.length > 0) {
+                            videoTitle = infoRes.data.items[0].snippet.title;
+                        }
+                    }
                 }
-                videoInfo = searchResults[0];
             }
 
-            const videoUrl = videoInfo.url;
-            const videoTitle = videoInfo.title || videoInfo.video_details?.title || "YouTube Video";
+            console.log(`[Music Debug] Streaming: ${videoTitle} (${videoUrl})`);
 
-            console.log(`[Music Debug] Final decision - Title: ${videoTitle}, URL: ${videoUrl}`);
+            // Use the "Stealth" arguments for yt-dlp extraction
+            const args = [
+                videoUrl,
+                '-o', '-',
+                '-f', 'bestaudio/best',
+                '--no-playlist',
+                '--force-ipv4',
+                '--no-check-certificates',
+                '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                '--referer', 'https://www.youtube.com/'
+            ];
 
-            // Get stream using the URL string (more stable than passing the object)
-            const stream = await play.stream(videoUrl, {
-                quality: 0,
-                discordPlayerCompatibility: true
-            });
+            const child = spawn(binaryPath, args);
 
-            const resource = createAudioResource(stream.stream, {
-                inputType: stream.type,
+            const resource = createAudioResource(child.stdout, {
+                inputType: StreamType.Arbitrary,
                 inlineVolume: true
             });
             
@@ -110,7 +103,7 @@ module.exports = {
                 console.error(`[AudioPlayer Error]`, error.message);
             });
 
-            await interaction.editReply(`Now playing: **${videoTitle || 'YouTube Audio'}**`);
+            await interaction.editReply(`Now playing: **${videoTitle}**`);
 
         } catch (error) {
             console.error('[Music Command Error]', error);
