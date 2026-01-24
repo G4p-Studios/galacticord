@@ -114,10 +114,10 @@ async function playNext(guildId, client) {
             '--ignore-config',
             '--no-cache-dir',
             '-o', '-',
-            // Force best audio
+            // FIX: Ensure this is lowercase -f for format selection
             '-f', 'ba/ba*',
-            // Use the 'web_embedded' and 'android_test' clients - these are the most successful for VPS
-            '--extractor-args', 'youtube:player_client=web_embedded,android_test;player_skip=web,mweb,ios,tv',
+            // BYPASS: web_creator is currently the best for 152-18 errors
+            '--extractor-args', 'youtube:player_client=web_creator,android,ios',
             '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
             '--referer', 'https://www.youtube.com/'
         ];
