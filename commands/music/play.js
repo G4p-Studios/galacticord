@@ -112,7 +112,11 @@ async function playNext(guildId, client) {
             '--force-ipv4',
             '--no-check-certificates',
             '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            '--referer', 'https://www.youtube.com/'
+            '--referer', 'https://www.youtube.com/',
+            // Use OAuth2 to authenticate the VPS via Google's API servers
+            '--username', 'oauth2',
+            // Use the Android client which is less prone to "Sign in" errors
+            '--extractor-args', 'youtube:player_client=android,web'
         ];
 
         console.log(`[Music Debug] Spawning yt-dlp for: ${song.title}`);
