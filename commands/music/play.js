@@ -67,19 +67,29 @@ module.exports = {
             }
 
             // Search and Stream using play-dl
-            let videoInfo;
+            let videoUrl;
+            let videoTitle;
+
             if (query.startsWith('http')) {
-                videoInfo = await play.video_info(query);
+                const videoInfo = await play.video_info(query);
+                videoUrl = videoInfo.video_details.url;
+                videoTitle = videoInfo.video_details.title;
             } else {
                 const searchResults = await play.search(query, { limit: 1 });
                 if (searchResults.length === 0) return interaction.editReply('No results found.');
-                videoInfo = searchResults[0];
+                videoUrl = searchResults[0].url;
+                videoTitle = searchResults[0].title;
             }
 
-            console.log(`[Music Debug] Streaming: ${videoInfo.title || videoInfo.url}`);
+            if (!videoUrl) {
+                // Final fallback if parsing failed
+                videoUrl = query.startsWith('http') ? query : null;
+            }
+
+            console.log(`[Music Debug] Streaming: ${videoTitle || videoUrl}`);
 
             // Get stream with VPS-friendly options
-            const stream = await play.stream(videoInfo.url, {
+            const stream = await play.stream(videoUrl, {
                 quality: 0,
                 discordPlayerCompatibility: true
             });
