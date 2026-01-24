@@ -72,8 +72,8 @@ module.exports = {
 
             if (query.startsWith('http')) {
                 const videoInfo = await play.video_info(query);
-                videoUrl = videoInfo.video_details.url;
-                videoTitle = videoInfo.video_details.title;
+                videoUrl = videoInfo.url;
+                videoTitle = videoInfo.title;
             } else {
                 const searchResults = await play.search(query, { limit: 1 });
                 if (searchResults.length === 0) return interaction.editReply('No results found.');
@@ -82,7 +82,6 @@ module.exports = {
             }
 
             if (!videoUrl) {
-                // Final fallback if parsing failed
                 videoUrl = query.startsWith('http') ? query : null;
             }
 
@@ -111,7 +110,7 @@ module.exports = {
                 console.error(`[AudioPlayer Error]`, error.message);
             });
 
-            await interaction.editReply(`Now playing: **${videoInfo.title || 'YouTube Audio'}**`);
+            await interaction.editReply(`Now playing: **${videoTitle || 'YouTube Audio'}**`);
 
         } catch (error) {
             console.error('[Music Command Error]', error);
