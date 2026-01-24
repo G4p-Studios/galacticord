@@ -110,10 +110,16 @@ async function playNext(guildId, client) {
             song.url,
             '--quiet',
             '--no-warnings',
+            '--no-check-certificates',
+            '--ignore-config',
+            '--no-cache-dir',
             '-o', '-',
+            // Best audio or any audio at all
             '-f', 'ba/ba*',
-            '--extractor-args', 'youtube:player_client=ios',
-            '--user-agent', 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X; en_US)'
+            // Bypass Strategy: Use Android client which is currently the most resilient
+            '--extractor-args', 'youtube:player_client=android,tv;player_skip=web',
+            '--user-agent', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36',
+            '--referer', 'https://www.youtube.com/'
         ];
 
         // Check for cookies.txt in the data folder

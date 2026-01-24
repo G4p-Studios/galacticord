@@ -7,29 +7,18 @@ const binaryPath = path.join(__dirname, '..', binaryName);
 
 // Ensure the binary exists
 async function ensureYtDlp() {
-    if (!fs.existsSync(binaryPath)) {
-        console.log('[System] Downloading yt-dlp binary...');
+    // Force a fresh download if the binary is older than 1 hour to ensure it's latest
+    const forceUpdate = fs.existsSync(binaryPath) && (Date.now() - fs.statSync(binaryPath).mtimeMs > 3600000);
+
+    if (!fs.existsSync(binaryPath) || forceUpdate) {
+        if (forceUpdate) console.log('[System] yt-dlp is more than 1 hour old. Updating to latest...');
+        else console.log('[System] Downloading yt-dlp binary...');
+        
         await YTDlpWrap.downloadFromGithub(binaryPath);
         if (process.platform !== 'win32') {
             fs.chmodSync(binaryPath, '755');
         }
-        console.log('[System] yt-dlp downloaded successfully and permissions set.');
-    } else {
-        // Check for updates if the file is older than 24 hours
-        const stats = fs.statSync(binaryPath);
-        const mtime = new Date(stats.mtime).getTime();
-        const now = new Date().getTime();
-        const twentyFourHours = 24 * 60 * 60 * 1000;
-
-        if (now - mtime > twentyFourHours) {
-            console.log('[System] Checking for yt-dlp updates...');
-            try {
-                await YTDlpWrap.downloadFromGithub(binaryPath);
-                console.log('[System] yt-dlp updated to the latest version.');
-            } catch (e) {
-                console.error('[System] Failed to update yt-dlp, using existing version:', e.message);
-            }
-        }
+        console.log('[System] yt-dlp is now at the latest version.');
     }
     return new YTDlpWrap(binaryPath);
 }
