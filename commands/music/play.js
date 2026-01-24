@@ -106,7 +106,7 @@ async function playNext(guildId, client) {
     const song = queue.songs[0];
     
     try {
-        const args = [
+        const musicArgs = [
             song.url,
             '-o', '-',
             // Force best audio or any available audio
@@ -114,12 +114,12 @@ async function playNext(guildId, client) {
             '--no-playlist',
             '--quiet',
             '--no-warnings',
-            '--force-ipv4',
             '--no-check-certificates',
             '--ignore-config',
             '--no-cache-dir',
-            // Use iOS as the primary client - currently the most resilient for VPS
-            '--extractor-args', 'youtube:player_client=ios,web,mweb,android,tv',
+            // ADVANCED BYPASS: Skip clients that are heavily throttled on VPS (Web/MWeb)
+            // Force use of iOS and Android APIs which are more lenient
+            '--extractor-args', 'youtube:player_client=ios,android,tv;player_skip=web,web_embedded,mweb,web_music,android_music',
             '--geo-bypass',
             '--user-agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
             '--referer', 'https://www.youtube.com/'
@@ -128,14 +128,14 @@ async function playNext(guildId, client) {
         // Check for cookies.txt in the data folder
         const cookiePath = path.join(__dirname, '../../data/cookies.txt');
         if (fs.existsSync(cookiePath)) {
-            args.push('--cookies', cookiePath);
+            musicArgs.push('--cookies', cookiePath);
             console.log(`[Music Debug] Auth: cookies.txt detected at ${cookiePath}`);
         } else {
             console.log(`[Music Debug] Auth: No cookies.txt found in data folder.`);
         }
 
-        console.log(`[Music Debug] Execution: ${binaryPath} ${args.join(' ')}`);
-        const child = spawn(binaryPath, args);
+        console.log(`[Music Debug] Execution: ${binaryPath} ${musicArgs.join(' ')}`);
+        const child = spawn(binaryPath, musicArgs);
 
         let errorBuffer = '';
         child.stderr.on('data', (data) => {
@@ -155,15 +155,22 @@ async function playNext(guildId, client) {
             if (code !== 0 && code !== null) {
                 console.error(`[Music Debug] yt-dlp exited with code ${code}. Full Stderr: ${errorBuffer}`);
                 
-                // Diagnostic: Run --list-formats to see what is actually available
-                const diagArgs = [song.url, '--list-formats', '--verbose', '--ignore-config', '--no-check-certificates', '--force-ipv4'];
+                // Diagnostic: Run --list-formats with the EXACT SAME BYPASS ARGS
+                const diagArgs = [
+                    song.url, 
+                    '--list-formats', 
+                    '--verbose', 
+                    '--ignore-config', 
+                    '--no-check-certificates',
+                    '--extractor-args', 'youtube:player_client=ios,android,tv;player_skip=web,web_embedded,mweb,web_music,android_music'
+                ];
                 if (fs.existsSync(cookiePath)) diagArgs.push('--cookies', cookiePath);
                 
                 const diag = spawn(binaryPath, diagArgs);
                 let diagOutput = '';
                 diag.stdout.on('data', (d) => diagOutput += d.toString());
                 diag.on('close', () => {
-                    console.log(`[Music Diagnostic] Available Formats for ${song.url}:\n${diagOutput}`);
+                    console.log(`[Music Diagnostic] Available Formats for ${song.url} (with bypass):\n${diagOutput}`);
                     queue.textChannel.send(`❌ **Playback Failed (Code ${code})**. \n*Check console for available formats diagnostic.*`);
                 });
             }
