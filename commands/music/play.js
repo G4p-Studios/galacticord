@@ -109,13 +109,16 @@ async function playNext(guildId, client) {
         const args = [
             song.url,
             '-o', '-',
-            '-f', 'bestaudio/best',
+            // Permanent Fix: Use a more resilient format selector
+            '-f', 'ba/ba*', 
             '--no-playlist',
             '--quiet',
             '--no-warnings',
             '--force-ipv4',
             '--no-check-certificates',
-            '--no-cache-dir',
+            // Permanent Fix: Spoof Android and Web clients to bypass VPS blocks
+            '--extractor-args', 'youtube:player_client=android,web,mweb',
+            '--geo-bypass',
             '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
             '--referer', 'https://www.youtube.com/'
         ];
