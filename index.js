@@ -8,6 +8,7 @@ const ffmpegStatic = require('ffmpeg-static');
 if (ffmpegStatic) {
     const ffmpegDir = path.dirname(ffmpegStatic);
     process.env.PATH = `${ffmpegDir}${path.delimiter}${process.env.PATH}`;
+    process.env.FFMPEG_PATH = ffmpegStatic;
     console.log(`[System] Added ffmpeg to PATH: ${ffmpegDir}`);
 }
 
