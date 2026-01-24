@@ -115,13 +115,27 @@ async function playNext(guildId, client) {
             '--referer', 'https://www.youtube.com/'
         ];
 
+        console.log(`[Music Debug] Spawning yt-dlp for: ${song.title}`);
         const child = spawn(binaryPath, args);
+
+        child.stderr.on('data', (data) => {
+            const msg = data.toString();
+            if (msg.includes('ERROR')) {
+                console.error(`[yt-dlp Error] ${msg}`);
+            }
+        });
+
+        child.on('error', (err) => {
+            console.error('[yt-dlp Process Error]', err);
+        });
+
         const resource = createAudioResource(child.stdout, {
             inputType: StreamType.Arbitrary,
             inlineVolume: true
         });
 
         queue.player.play(resource);
+        
         if (queue.songs.length > 1) {
             queue.textChannel.send(`🎶 Now playing: **${song.title}**`);
         }
