@@ -27,6 +27,10 @@ module.exports = {
                 adapterCreator: interaction.guild.voiceAdapterCreator,
             });
 
+            // Check for cookies
+            const cookiesPath = path.join(__dirname, '../../data/cookies.txt');
+            const cookieArgs = fs.existsSync(cookiesPath) ? ['--cookies', cookiesPath] : [];
+
             // Get Video Metadata first using the wrapper (it handles JSON parsing well)
             let videoUrl = query;
             let videoTitle = "Unknown Song";
@@ -37,7 +41,8 @@ module.exports = {
                 const metadata = await ytDlp.execPromise([
                     `ytsearch1:${query}`,
                     '--dump-json',
-                    '--no-playlist'
+                    '--no-playlist',
+                    ...cookieArgs
                 ]);
                 
                 const info = JSON.parse(metadata);
@@ -48,7 +53,8 @@ module.exports = {
                 const metadata = await ytDlp.execPromise([
                     query,
                     '--dump-json',
-                    '--no-playlist'
+                    '--no-playlist',
+                    ...cookieArgs
                 ]);
                 const info = JSON.parse(metadata);
                 videoTitle = info.title;
@@ -58,13 +64,13 @@ module.exports = {
             console.log(`[Music Debug] Playing: ${videoTitle} (${videoUrl})`);
 
             // Spawn the process natively to get the raw stdout stream
-            // This bypasses the wrapper's stream handling which was causing the "undefined" error
             const args = [
                 videoUrl,
                 '-o', '-',
                 '-f', 'bestaudio',
                 '--no-playlist',
-                '--retry', '3'
+                '--retry', '3',
+                ...cookieArgs
             ];
 
             const child = spawn(binaryPath, args);
