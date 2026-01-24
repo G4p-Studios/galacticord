@@ -3,6 +3,8 @@ const { joinVoiceChannel, createAudioPlayer, createAudioResource, VoiceConnectio
 const { ensureYtDlp, binaryPath } = require('../../utils/ytDlpHelper');
 const { spawn } = require('child_process');
 const axios = require('axios');
+const path = require('path');
+const fs = require('fs');
 
 module.exports = {
     data: new SlashCommandBuilder()
