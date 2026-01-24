@@ -2,6 +2,8 @@ const { SlashCommandBuilder } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus } = require('@discordjs/voice');
 const { ensureYtDlp, binaryPath } = require('../../utils/ytDlpHelper');
 const { spawn } = require('child_process');
+const path = require('path');
+const fs = require('fs');
 
 module.exports = {
     data: new SlashCommandBuilder()
