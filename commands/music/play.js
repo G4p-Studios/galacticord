@@ -29,48 +29,62 @@ module.exports = {
                 adapterCreator: interaction.guild.voiceAdapterCreator,
             });
 
-            // Check for cookies and setup common arguments
-            // Use process.cwd() to ensure we find the data folder regardless of where the bot is started
+            // Setup common arguments for yt-dlp
             const cookiesPath = path.resolve(process.cwd(), 'data', 'cookies.txt');
+            const cachePath = path.resolve(process.cwd(), 'data', '.cache');
             
-            // Explicitly tell yt-dlp to use the current Node.js binary as the runtime
-            const commonArgs = ['--js-runtimes', `node:${process.execPath}`];
+            // Ensure cache directory exists
+            if (!fs.existsSync(cachePath)) fs.mkdirSync(cachePath, { recursive: true });
+
+            // We try multiple ways to get a JS runtime working on Linux VPS
+            const commonArgs = [
+                '--js-runtimes', 'node', 
+                '--cache-dir', cachePath,
+                '--no-check-certificates',
+                '--ignore-config',
+                '--no-warnings'
+            ];
             
             if (fs.existsSync(cookiesPath)) {
                 console.log(`[Music Debug] SUCCESS: Found cookies.txt at: ${cookiesPath}`);
                 commonArgs.push('--cookies', cookiesPath);
             } else {
                 console.log(`[Music Debug] WARNING: No cookies.txt found at: ${cookiesPath}`);
-                console.log(`[Music Debug] Please ensure your file is at: galacticord/data/cookies.txt`);
             }
 
-            // Get Video Metadata first using the wrapper
+            console.log(`[Music Debug] Using args: ${commonArgs.join(' ')}`);
+
+            // Get Video Metadata
             let videoUrl = query;
             let videoTitle = "Unknown Song";
 
-            if (!query.startsWith('http')) {
-                console.log(`[Music Debug] Searching for: ${query}`);
-                const metadata = await ytDlp.execPromise([
-                    `ytsearch1:${query}`,
-                    '--dump-json',
-                    '--no-playlist',
-                    ...commonArgs
-                ]);
-                
-                const info = JSON.parse(metadata);
-                videoUrl = info.webpage_url;
-                videoTitle = info.title;
-            } else {
-                console.log(`[Music Debug] Fetching metadata for: ${query}`);
-                const metadata = await ytDlp.execPromise([
-                    query,
-                    '--dump-json',
-                    '--no-playlist',
-                    ...commonArgs
-                ]);
-                const info = JSON.parse(metadata);
-                videoTitle = info.title;
-                videoUrl = info.webpage_url;
+            try {
+                if (!query.startsWith('http')) {
+                    console.log(`[Music Debug] Searching: ${query}`);
+                    const metadata = await ytDlp.execPromise([
+                        `ytsearch1:${query}`,
+                        '--dump-json',
+                        '--no-playlist',
+                        ...commonArgs
+                    ]);
+                    const info = JSON.parse(metadata);
+                    videoUrl = info.webpage_url;
+                    videoTitle = info.title;
+                } else {
+                    console.log(`[Music Debug] Metadata fetch: ${query}`);
+                    const metadata = await ytDlp.execPromise([
+                        query,
+                        '--dump-json',
+                        '--no-playlist',
+                        ...commonArgs
+                    ]);
+                    const info = JSON.parse(metadata);
+                    videoTitle = info.title;
+                    videoUrl = info.webpage_url;
+                }
+            } catch (err) {
+                console.error("[Music Debug] yt-dlp Metadata Error:", err.message);
+                throw err;
             }
 
             console.log(`[Music Debug] Playing: ${videoTitle} (${videoUrl})`);
