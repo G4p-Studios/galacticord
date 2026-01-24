@@ -108,20 +108,12 @@ async function playNext(guildId, client) {
     try {
         const musicArgs = [
             song.url,
-            '-o', '-',
-            // EXTREME FALLBACK: Try best audio, then any audio, then any format at all
-            '-f', 'ba/ba*/best',
-            '--no-playlist',
             '--quiet',
             '--no-warnings',
-            '--no-check-certificates',
-            '--ignore-config',
-            '--no-cache-dir',
-            // ULTIMATE BYPASS: Use 'ios' and 'android_test' which are least likely to be blocked
-            '--extractor-args', 'youtube:player_client=ios,android_test,tv;player_skip=web,web_embedded,mweb,web_music,android_music',
-            '--geo-bypass',
-            '--user-agent', 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X; en_US)',
-            '--referer', 'https://www.youtube.com/'
+            '-o', '-',
+            '-f', 'ba/ba*',
+            '--extractor-args', 'youtube:player_client=ios',
+            '--user-agent', 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X; en_US)'
         ];
 
         // Check for cookies.txt in the data folder
