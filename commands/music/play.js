@@ -109,13 +109,12 @@ async function playNext(guildId, client) {
         const args = [
             song.url,
             '-o', '-',
-            '-f', 'bestaudio/best',
+            '-f', 'ba*[vcodec=none]/bestaudio/best',
             '--no-playlist',
             '--force-ipv4',
             '--no-check-certificates',
             '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            '--referer', 'https://www.youtube.com/',
-            '--extractor-args', 'youtube:player_client=android,web'
+            '--referer', 'https://www.youtube.com/'
         ];
 
         // Check for cookies.txt in the data folder
