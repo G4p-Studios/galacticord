@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, StreamType, VoiceConnectionStatus } = require('@discordjs/voice');
+const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, StreamType, VoiceConnectionStatus, entersState, getVoiceConnection } = require('@discordjs/voice');
 const { ensureYtDlp, binaryPath } = require('../../utils/ytDlpHelper');
 const { spawn } = require('child_process');
 const path = require('path');
@@ -23,22 +23,20 @@ module.exports = {
         try {
             const ytDlp = await ensureYtDlp();
 
-            const connection = joinVoiceChannel({
-                channelId: channel.id,
-                guildId: interaction.guild.id,
-                adapterCreator: interaction.guild.voiceAdapterCreator,
-            });
-
-            // Wait for connection to be ready (with a timeout)
-            try {
-                await new Promise((resolve, reject) => {
-                    const timeout = setTimeout(() => reject(new Error('Voice connection timeout')), 10000);
-                    connection.once(VoiceConnectionStatus.Ready, () => {
-                        clearTimeout(timeout);
-                        resolve();
-                    });
+            let connection = getVoiceConnection(interaction.guild.id);
+            if (!connection) {
+                connection = joinVoiceChannel({
+                    channelId: channel.id,
+                    guildId: interaction.guild.id,
+                    adapterCreator: interaction.guild.voiceAdapterCreator,
                 });
+            }
+
+            // Wait for connection to be ready
+            try {
+                await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
             } catch (e) {
+                console.error('[Music] Connection failed to reach Ready state:', e.message);
                 return interaction.editReply('Failed to connect to voice channel.');
             }
 
@@ -57,7 +55,6 @@ module.exports = {
             ];
             
             if (fs.existsSync(cookiesPath)) {
-                console.log(`[Music Debug] SUCCESS: Found cookies.txt at: ${cookiesPath}`);
                 commonArgs.push('--cookies', cookiesPath);
             }
 
@@ -95,7 +92,6 @@ module.exports = {
 
             console.log(`[Music Debug] Streaming: ${videoTitle}`);
 
-            // Spawn yt-dlp to stdout
             const args = [
                 videoUrl,
                 '-o', '-',
@@ -106,7 +102,6 @@ module.exports = {
 
             const child = spawn(binaryPath, args);
 
-            // Use StreamType.Arbitrary to force ffmpeg transcoding
             const resource = createAudioResource(child.stdout, {
                 inputType: StreamType.Arbitrary,
                 inlineVolume: true
@@ -117,7 +112,7 @@ module.exports = {
             connection.subscribe(player);
 
             player.on('stateChange', (oldState, newState) => {
-                console.log(`[Player Debug] State changed from ${oldState.status} to ${newState.status}`);
+                console.log(`[Player Debug] State: ${oldState.status} -> ${newState.status}`);
             });
 
             player.on('error', error => {
@@ -126,6 +121,10 @@ module.exports = {
             
             child.on('error', error => {
                 console.error(`[yt-dlp Process Error]`, error);
+            });
+
+            child.stderr.on('data', data => {
+                console.log(`[yt-dlp stderr] ${data}`);
             });
 
             await interaction.editReply(`Now playing: **${videoTitle}**`);

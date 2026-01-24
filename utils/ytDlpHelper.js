@@ -10,9 +10,11 @@ async function ensureYtDlp() {
     if (!fs.existsSync(binaryPath)) {
         console.log('[System] Downloading yt-dlp binary...');
         await YTDlpWrap.downloadFromGithub(binaryPath);
-        console.log('[System] yt-dlp downloaded successfully.');
+        if (process.platform !== 'win32') {
+            fs.chmodSync(binaryPath, '755');
+        }
+        console.log('[System] yt-dlp downloaded successfully and permissions set.');
     }
-    // We can add a check here to update if needed
     return new YTDlpWrap(binaryPath);
 }
 
