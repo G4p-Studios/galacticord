@@ -40,15 +40,27 @@ module.exports = {
             const cookiesPath = path.resolve(process.cwd(), 'data', 'cookies.txt');
             if (fs.existsSync(cookiesPath)) {
                 try {
-                    // Read the cookies file. play-dl can attempt to use it.
-                    // We set it globally so search and video_info also use it.
                     const cookieData = fs.readFileSync(cookiesPath, 'utf8');
+                    // Parse Netscape cookies.txt to standard cookie string
+                    const cookieString = cookieData
+                        .split('\n')
+                        .filter(line => line.trim() && !line.startsWith('#'))
+                        .map(line => {
+                            const parts = line.split('\t');
+                            if (parts.length >= 7) {
+                                return `${parts[5]}=${parts[6].trim()}`;
+                            }
+                            return null;
+                        })
+                        .filter(Boolean)
+                        .join('; ');
+
                     await play.setToken({
                         youtube: {
-                            cookie: cookieData
+                            cookie: cookieString
                         }
                     });
-                    console.log(`[Music Debug] Cookies loaded into play-dl.`);
+                    console.log(`[Music Debug] Cookies parsed and loaded into play-dl.`);
                 } catch (cookieErr) {
                     console.error(`[Music Debug] Error loading cookies:`, cookieErr.message);
                 }
