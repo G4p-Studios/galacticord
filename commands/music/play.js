@@ -109,9 +109,10 @@ async function playNext(guildId, client) {
         const args = [
             song.url,
             '-o', '-',
-            // Use the most compatible audio formats for Discord (Opus/M4A)
-            '-f', 'bestaudio',
+            '-f', 'bestaudio/best',
             '--no-playlist',
+            '--quiet',
+            '--no-warnings',
             '--force-ipv4',
             '--no-check-certificates',
             '--no-cache-dir',

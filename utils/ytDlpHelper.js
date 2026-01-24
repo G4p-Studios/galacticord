@@ -15,9 +15,21 @@ async function ensureYtDlp() {
         }
         console.log('[System] yt-dlp downloaded successfully and permissions set.');
     } else {
-        // Occasionally check for updates
-        // For simplicity, we'll just return the wrapper here, 
-        // but you could add a version check logic if needed.
+        // Check for updates if the file is older than 24 hours
+        const stats = fs.statSync(binaryPath);
+        const mtime = new Date(stats.mtime).getTime();
+        const now = new Date().getTime();
+        const twentyFourHours = 24 * 60 * 60 * 1000;
+
+        if (now - mtime > twentyFourHours) {
+            console.log('[System] Checking for yt-dlp updates...');
+            try {
+                await YTDlpWrap.downloadFromGithub(binaryPath);
+                console.log('[System] yt-dlp updated to the latest version.');
+            } catch (e) {
+                console.error('[System] Failed to update yt-dlp, using existing version:', e.message);
+            }
+        }
     }
     return new YTDlpWrap(binaryPath);
 }
