@@ -36,15 +36,25 @@ module.exports = {
                 return interaction.editReply('Failed to connect to voice channel.');
             }
 
-            // Check for cookies
+            // Load cookies into play-dl globally
             const cookiesPath = path.resolve(process.cwd(), 'data', 'cookies.txt');
             if (fs.existsSync(cookiesPath)) {
-                console.log(`[Music Debug] Using cookies from: ${cookiesPath}`);
-                // play-dl can use cookies from a file
-                // Note: some versions of play-dl require authorization() call for cookies
+                try {
+                    // Read the cookies file. play-dl can attempt to use it.
+                    // We set it globally so search and video_info also use it.
+                    const cookieData = fs.readFileSync(cookiesPath, 'utf8');
+                    await play.setToken({
+                        youtube: {
+                            cookie: cookieData
+                        }
+                    });
+                    console.log(`[Music Debug] Cookies loaded into play-dl.`);
+                } catch (cookieErr) {
+                    console.error(`[Music Debug] Error loading cookies:`, cookieErr.message);
+                }
             }
 
-            // Search and Stream using play-dl (it handles VPS issues better)
+            // Search and Stream using play-dl
             let videoInfo;
             if (query.startsWith('http')) {
                 videoInfo = await play.video_info(query);
@@ -58,10 +68,8 @@ module.exports = {
 
             // Get stream with VPS-friendly options
             const stream = await play.stream(videoInfo.url, {
-                quality: 0, // 0 is best audio
-                discordPlayerCompatibility: true,
-                // We pass cookies if they exist
-                ...(fs.existsSync(cookiesPath) ? { cookies: cookiesPath } : {})
+                quality: 0,
+                discordPlayerCompatibility: true
             });
 
             const resource = createAudioResource(stream.stream, {
