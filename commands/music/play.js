@@ -109,16 +109,14 @@ async function playNext(guildId, client) {
         const args = [
             song.url,
             '-o', '-',
-            // Broadest possible audio selection
-            '-f', 'ba/b',
-            '--extract-audio',
-            '--audio-format', 'mp3',
+            // Use the most compatible audio formats for Discord (Opus/M4A)
+            '-f', 'bestaudio',
             '--no-playlist',
             '--force-ipv4',
             '--no-check-certificates',
+            '--no-cache-dir',
             '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            '--referer', 'https://www.youtube.com/',
-            '--ffmpeg-location', process.env.FFMPEG_PATH || 'ffmpeg'
+            '--referer', 'https://www.youtube.com/'
         ];
 
         // Check for cookies.txt in the data folder

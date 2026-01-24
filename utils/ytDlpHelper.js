@@ -14,6 +14,10 @@ async function ensureYtDlp() {
             fs.chmodSync(binaryPath, '755');
         }
         console.log('[System] yt-dlp downloaded successfully and permissions set.');
+    } else {
+        // Occasionally check for updates
+        // For simplicity, we'll just return the wrapper here, 
+        // but you could add a version check logic if needed.
     }
     return new YTDlpWrap(binaryPath);
 }
