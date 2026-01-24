@@ -109,7 +109,10 @@ async function playNext(guildId, client) {
         const args = [
             song.url,
             '-o', '-',
-            '-f', 'ba*[vcodec=none]/bestaudio/best',
+            // Force the best audio format and extract it as mp3 for maximum compatibility
+            '-f', 'bestaudio/best',
+            '--extract-audio',
+            '--audio-format', 'mp3',
             '--no-playlist',
             '--force-ipv4',
             '--no-check-certificates',
