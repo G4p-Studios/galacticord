@@ -109,15 +109,15 @@ async function playNext(guildId, client) {
         const args = [
             song.url,
             '-o', '-',
-            // Permanent Fix: Use a more resilient format selector
-            '-f', 'ba/ba*', 
+            // Force the most compatible and available audio formats
+            '-f', 'bestaudio[ext=m4a]/bestaudio/best[ext=mp4]/best',
             '--no-playlist',
             '--quiet',
             '--no-warnings',
             '--force-ipv4',
             '--no-check-certificates',
-            // Permanent Fix: Spoof Android and Web clients to bypass VPS blocks
-            '--extractor-args', 'youtube:player_client=android,web,mweb',
+            // Use TV and Android clients - TV is currently the most stable for VPS
+            '--extractor-args', 'youtube:player_client=tv,android,web',
             '--geo-bypass',
             '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
             '--referer', 'https://www.youtube.com/'
@@ -127,7 +127,9 @@ async function playNext(guildId, client) {
         const cookiePath = path.join(__dirname, '../../data/cookies.txt');
         if (fs.existsSync(cookiePath)) {
             args.push('--cookies', cookiePath);
-            console.log('[Music Debug] Using cookies.txt from data folder for authentication.');
+            console.log(`[Music Debug] Using cookies.txt from: ${cookiePath}`);
+        } else {
+            console.log(`[Music Debug] No cookies.txt found at: ${cookiePath}`);
         }
 
         console.log(`[Music Debug] Spawning yt-dlp for: ${song.title}`);
