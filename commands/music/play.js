@@ -51,6 +51,8 @@ module.exports = {
                 '--cache-dir', cachePath,
                 '--no-check-certificates',
                 '--no-warnings',
+                '--force-ipv4',
+                '--add-header', 'Accept-Language: en-US,en;q=0.9',
                 '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
             ];
             
@@ -72,7 +74,7 @@ module.exports = {
                     ]);
                     const info = JSON.parse(metadata);
                     const firstEntry = info.entries ? info.entries[0] : info;
-                    videoUrl = firstEntry.url || firstEntry.webpage_url;
+                    videoUrl = firstEntry.url || firstEntry.webpage_url || `https://www.youtube.com/watch?v=${firstEntry.id}`;
                     videoTitle = firstEntry.title;
                 } else {
                     const metadata = await ytDlp.execPromise([
@@ -95,7 +97,7 @@ module.exports = {
             const args = [
                 videoUrl,
                 '-o', '-',
-                '-f', 'bestaudio',
+                '-f', 'ba/ba*',
                 '--no-playlist',
                 ...commonArgs
             ];
