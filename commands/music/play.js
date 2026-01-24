@@ -71,21 +71,33 @@ module.exports = {
             let videoTitle;
 
             if (query.startsWith('http')) {
-                const videoInfo = await play.video_info(query);
-                videoUrl = videoInfo.url;
-                videoTitle = videoInfo.title;
+                videoUrl = query; // Use the query directly as the URL if it's a link
+                try {
+                    const videoInfo = await play.video_info(query);
+                    // play-dl sometimes puts details inside video_details
+                    videoTitle = videoInfo.video_details?.title || videoInfo.title || "YouTube Video";
+                    console.log(`[Music Debug] Fetched info for direct link. Title: ${videoTitle}`);
+                } catch (e) {
+                    console.log(`[Music Debug] Could not fetch metadata, using URL directly. Error: ${e.message}`);
+                    videoTitle = "YouTube Video";
+                }
             } else {
+                console.log(`[Music Debug] Searching for: ${query}`);
                 const searchResults = await play.search(query, { limit: 1 });
-                if (searchResults.length === 0) return interaction.editReply('No results found.');
-                videoUrl = searchResults[0].url;
-                videoTitle = searchResults[0].title;
+                if (!searchResults || searchResults.length === 0) {
+                    return interaction.editReply('No results found for your search.');
+                }
+                const firstResult = searchResults[0];
+                videoUrl = firstResult.url;
+                videoTitle = firstResult.title;
+                console.log(`[Music Debug] Search found: ${videoTitle} (${videoUrl})`);
             }
 
-            if (!videoUrl) {
-                videoUrl = query.startsWith('http') ? query : null;
+            if (!videoUrl || videoUrl === 'undefined') {
+                throw new Error("Could not determine a valid video URL.");
             }
 
-            console.log(`[Music Debug] Streaming: ${videoTitle || videoUrl}`);
+            console.log(`[Music Debug] Final decision - Title: ${videoTitle}, URL: ${videoUrl}`);
 
             // Get stream with VPS-friendly options
             const stream = await play.stream(videoUrl, {
