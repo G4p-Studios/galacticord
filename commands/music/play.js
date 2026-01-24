@@ -118,11 +118,11 @@ async function playNext(guildId, client) {
             '--extractor-args', 'youtube:player_client=android,web'
         ];
 
-        // Check for cookies.txt in the project root
-        const cookiePath = path.join(__dirname, '../../cookies.txt');
+        // Check for cookies.txt in the data folder
+        const cookiePath = path.join(__dirname, '../../data/cookies.txt');
         if (fs.existsSync(cookiePath)) {
             args.push('--cookies', cookiePath);
-            console.log('[Music Debug] Using cookies.txt for authentication.');
+            console.log('[Music Debug] Using cookies.txt from data folder for authentication.');
         }
 
         console.log(`[Music Debug] Spawning yt-dlp for: ${song.title}`);
