@@ -109,17 +109,19 @@ async function playNext(guildId, client) {
         const args = [
             song.url,
             '-o', '-',
-            // Force the most compatible and available audio formats
-            '-f', 'bestaudio[ext=m4a]/bestaudio/best[ext=mp4]/best',
+            // Force best audio or any available audio
+            '-f', 'ba/ba*',
             '--no-playlist',
             '--quiet',
             '--no-warnings',
             '--force-ipv4',
             '--no-check-certificates',
-            // Use TV and Android clients - TV is currently the most stable for VPS
-            '--extractor-args', 'youtube:player_client=tv,android,web',
+            '--ignore-config',
+            '--no-cache-dir',
+            // Use iOS as the primary client - currently the most resilient for VPS
+            '--extractor-args', 'youtube:player_client=ios,web,mweb,android,tv',
             '--geo-bypass',
-            '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            '--user-agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
             '--referer', 'https://www.youtube.com/'
         ];
 
@@ -154,7 +156,7 @@ async function playNext(guildId, client) {
                 console.error(`[Music Debug] yt-dlp exited with code ${code}. Full Stderr: ${errorBuffer}`);
                 
                 // Diagnostic: Run --list-formats to see what is actually available
-                const diagArgs = [song.url, '--list-formats', '--no-check-certificates', '--force-ipv4'];
+                const diagArgs = [song.url, '--list-formats', '--verbose', '--ignore-config', '--no-check-certificates', '--force-ipv4'];
                 if (fs.existsSync(cookiePath)) diagArgs.push('--cookies', cookiePath);
                 
                 const diag = spawn(binaryPath, diagArgs);
