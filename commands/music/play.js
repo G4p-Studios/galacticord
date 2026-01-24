@@ -29,22 +29,28 @@ module.exports = {
                 adapterCreator: interaction.guild.voiceAdapterCreator,
             });
 
-            // Check for cookies
-            const cookiesPath = path.join(__dirname, '../../data/cookies.txt');
-            const cookieArgs = fs.existsSync(cookiesPath) ? ['--cookies', cookiesPath] : [];
+            // Check for cookies and setup common arguments
+            const cookiesPath = path.join(__dirname, '..', '..', 'data', 'cookies.txt');
+            const commonArgs = ['--js-runtimes', 'node'];
+            
+            if (fs.existsSync(cookiesPath)) {
+                console.log(`[Music Debug] Found cookies.txt at: ${cookiesPath}`);
+                commonArgs.push('--cookies', cookiesPath);
+            } else {
+                console.log(`[Music Debug] No cookies.txt found at: ${cookiesPath}`);
+            }
 
-            // Get Video Metadata first using the wrapper (it handles JSON parsing well)
+            // Get Video Metadata first using the wrapper
             let videoUrl = query;
             let videoTitle = "Unknown Song";
 
-            // If it's not a link, search first
             if (!query.startsWith('http')) {
                 console.log(`[Music Debug] Searching for: ${query}`);
                 const metadata = await ytDlp.execPromise([
                     `ytsearch1:${query}`,
                     '--dump-json',
                     '--no-playlist',
-                    ...cookieArgs
+                    ...commonArgs
                 ]);
                 
                 const info = JSON.parse(metadata);
@@ -56,23 +62,23 @@ module.exports = {
                     query,
                     '--dump-json',
                     '--no-playlist',
-                    ...cookieArgs
+                    ...commonArgs
                 ]);
                 const info = JSON.parse(metadata);
                 videoTitle = info.title;
-                videoUrl = info.webpage_url; // Normalized URL
+                videoUrl = info.webpage_url;
             }
 
             console.log(`[Music Debug] Playing: ${videoTitle} (${videoUrl})`);
 
-            // Spawn the process natively to get the raw stdout stream
+            // Spawn the process natively
             const args = [
                 videoUrl,
                 '-o', '-',
                 '-f', 'bestaudio',
                 '--no-playlist',
                 '--retry', '3',
-                ...cookieArgs
+                ...commonArgs
             ];
 
             const child = spawn(binaryPath, args);
