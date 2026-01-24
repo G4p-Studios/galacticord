@@ -127,16 +127,18 @@ async function playNext(guildId, client) {
         const cookiePath = path.join(__dirname, '../../data/cookies.txt');
         if (fs.existsSync(cookiePath)) {
             args.push('--cookies', cookiePath);
-            console.log(`[Music Debug] Using cookies.txt from: ${cookiePath}`);
+            console.log(`[Music Debug] Auth: cookies.txt detected at ${cookiePath}`);
         } else {
-            console.log(`[Music Debug] No cookies.txt found at: ${cookiePath}`);
+            console.log(`[Music Debug] Auth: No cookies.txt found in data folder.`);
         }
 
-        console.log(`[Music Debug] Spawning yt-dlp for: ${song.title}`);
+        console.log(`[Music Debug] Execution: ${binaryPath} ${args.join(' ')}`);
         const child = spawn(binaryPath, args);
 
+        let errorBuffer = '';
         child.stderr.on('data', (data) => {
             const msg = data.toString();
+            errorBuffer += msg;
             if (msg.includes('ERROR')) {
                 console.error(`[yt-dlp Error] ${msg}`);
             }
@@ -144,6 +146,25 @@ async function playNext(guildId, client) {
 
         child.on('error', (err) => {
             console.error('[yt-dlp Process Error]', err);
+            queue.textChannel.send(`❌ Process Error: ${err.message}`);
+        });
+
+        child.on('close', async (code) => {
+            if (code !== 0 && code !== null) {
+                console.error(`[Music Debug] yt-dlp exited with code ${code}. Full Stderr: ${errorBuffer}`);
+                
+                // Diagnostic: Run --list-formats to see what is actually available
+                const diagArgs = [song.url, '--list-formats', '--no-check-certificates', '--force-ipv4'];
+                if (fs.existsSync(cookiePath)) diagArgs.push('--cookies', cookiePath);
+                
+                const diag = spawn(binaryPath, diagArgs);
+                let diagOutput = '';
+                diag.stdout.on('data', (d) => diagOutput += d.toString());
+                diag.on('close', () => {
+                    console.log(`[Music Diagnostic] Available Formats for ${song.url}:\n${diagOutput}`);
+                    queue.textChannel.send(`❌ **Playback Failed (Code ${code})**. \n*Check console for available formats diagnostic.*`);
+                });
+            }
         });
 
         const resource = createAudioResource(child.stdout, {
