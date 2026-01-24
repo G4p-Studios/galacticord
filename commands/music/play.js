@@ -114,11 +114,11 @@ async function playNext(guildId, client) {
             '--ignore-config',
             '--no-cache-dir',
             '-o', '-',
-            // Best audio or any audio at all
+            // Force best audio
             '-f', 'ba/ba*',
-            // Bypass Strategy: Use Android client which is currently the most resilient
-            '--extractor-args', 'youtube:player_client=android,tv;player_skip=web',
-            '--user-agent', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36',
+            // Use the 'web_embedded' and 'android_test' clients - these are the most successful for VPS
+            '--extractor-args', 'youtube:player_client=web_embedded,android_test;player_skip=web,mweb,ios,tv',
+            '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
             '--referer', 'https://www.youtube.com/'
         ];
 
