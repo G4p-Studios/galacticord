@@ -109,19 +109,18 @@ async function playNext(guildId, client) {
         const musicArgs = [
             song.url,
             '-o', '-',
-            // Force best audio or any available audio
-            '-f', 'ba/ba*',
+            // EXTREME FALLBACK: Try best audio, then any audio, then any format at all
+            '-f', 'ba/ba*/best',
             '--no-playlist',
             '--quiet',
             '--no-warnings',
             '--no-check-certificates',
             '--ignore-config',
             '--no-cache-dir',
-            // ADVANCED BYPASS: Skip clients that are heavily throttled on VPS (Web/MWeb)
-            // Force use of iOS and Android APIs which are more lenient
-            '--extractor-args', 'youtube:player_client=ios,android,tv;player_skip=web,web_embedded,mweb,web_music,android_music',
+            // ULTIMATE BYPASS: Use 'ios' and 'android_test' which are least likely to be blocked
+            '--extractor-args', 'youtube:player_client=ios,android_test,tv;player_skip=web,web_embedded,mweb,web_music,android_music',
             '--geo-bypass',
-            '--user-agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+            '--user-agent', 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X; en_US)',
             '--referer', 'https://www.youtube.com/'
         ];
 
@@ -162,7 +161,7 @@ async function playNext(guildId, client) {
                     '--verbose', 
                     '--ignore-config', 
                     '--no-check-certificates',
-                    '--extractor-args', 'youtube:player_client=ios,android,tv;player_skip=web,web_embedded,mweb,web_music,android_music'
+                    '--extractor-args', 'youtube:player_client=ios,android_test,tv;player_skip=web,web_embedded,mweb,web_music,android_music'
                 ];
                 if (fs.existsSync(cookiePath)) diagArgs.push('--cookies', cookiePath);
                 
