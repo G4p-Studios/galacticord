@@ -87,9 +87,8 @@ module.exports = {
 
             console.log(`[Music Debug] Final decision - Title: ${videoTitle}, URL: ${videoUrl}`);
 
-            // Get stream using the full videoInfo object instead of just the URL
-            // This is more reliable as it avoids play-dl having to re-fetch metadata
-            const stream = await play.stream(videoInfo, {
+            // Get stream using the URL string (more stable than passing the object)
+            const stream = await play.stream(videoUrl, {
                 quality: 0,
                 discordPlayerCompatibility: true
             });
