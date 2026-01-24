@@ -35,24 +35,21 @@ module.exports = {
             
             if (!fs.existsSync(cachePath)) fs.mkdirSync(cachePath, { recursive: true });
 
+            // Using absolute Node path and removing restrictive extractor-args to fix "format not available"
             const commonArgs = [
-                '--js-runtimes', 'node',
+                '--js-runtimes', `node:${process.execPath}`,
                 '--cache-dir', cachePath,
                 '--no-check-certificates',
                 '--no-warnings',
-                '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                '--extractor-args', 'youtube:player_client=android,web'
+                '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
             ];
             
             if (fs.existsSync(cookiesPath)) {
                 console.log(`[Music Debug] SUCCESS: Found cookies.txt at: ${cookiesPath}`);
                 commonArgs.push('--cookies', cookiesPath);
             } else {
-                console.log(`[Music Debug] WARNING: No cookies.txt found at: ${cookiesPath}. Bot check may fail.`);
-                console.log(`[Music Debug] CWD: ${process.cwd()}`);
+                console.log(`[Music Debug] WARNING: No cookies.txt found at: ${cookiesPath}`);
             }
-
-            console.log(`[Music Debug] Executing yt-dlp with cookie support and JS runtime.`);
 
             // Get Video Metadata
             let videoUrl = query;
@@ -64,12 +61,14 @@ module.exports = {
                     const metadata = await ytDlp.execPromise([
                         `ytsearch1:${query}`,
                         '--dump-json',
-                        '--no-playlist',
+                        '--flat-playlist',
                         ...commonArgs
                     ]);
                     const info = JSON.parse(metadata);
-                    videoUrl = info.webpage_url;
-                    videoTitle = info.title;
+                    // Search results are often in an 'entries' array
+                    const firstEntry = info.entries ? info.entries[0] : info;
+                    videoUrl = firstEntry.url || firstEntry.webpage_url;
+                    videoTitle = firstEntry.title;
                 } else {
                     console.log(`[Music Debug] Metadata fetch: ${query}`);
                     const metadata = await ytDlp.execPromise([
@@ -84,7 +83,12 @@ module.exports = {
                 }
             } catch (err) {
                 console.error("[Music Debug] yt-dlp Metadata Error:", err.message);
-                throw err;
+                // Last ditch effort: if JSON dump fails, just use the query as the URL
+                if (query.startsWith('http')) {
+                    videoUrl = query;
+                } else {
+                    throw err;
+                }
             }
 
             console.log(`[Music Debug] Playing: ${videoTitle} (${videoUrl})`);
