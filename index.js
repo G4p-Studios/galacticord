@@ -1,7 +1,9 @@
-const { Client, Collection, GatewayIntentBits, Partials, REST, Routes } = require('discord.js');
+const { Client, Collection, GatewayIntentBits, Partials, REST, Routes, version } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
+
+console.log(`[System] Starting bot with discord.js v${version}`);
 
 // Add ffmpeg to PATH
 const ffmpegStatic = require('ffmpeg-static');
