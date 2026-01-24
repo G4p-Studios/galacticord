@@ -36,12 +36,11 @@ module.exports = {
                 return interaction.editReply('Failed to connect to voice channel.');
             }
 
-            // Load cookies into play-dl globally
+            // Load cookies and authorize play-dl
             const cookiesPath = path.resolve(process.cwd(), 'data', 'cookies.txt');
             if (fs.existsSync(cookiesPath)) {
                 try {
                     const cookieData = fs.readFileSync(cookiesPath, 'utf8');
-                    // Parse Netscape cookies.txt to standard cookie string
                     const cookieString = cookieData
                         .split('\n')
                         .filter(line => line.trim() && !line.startsWith('#'))
@@ -55,15 +54,24 @@ module.exports = {
                         .filter(Boolean)
                         .join('; ');
 
-                    await play.setToken({
-                        youtube: {
-                            cookie: cookieString
-                        }
-                    });
-                    console.log(`[Music Debug] Cookies parsed and loaded into play-dl.`);
+                    if (cookieString) {
+                        await play.setToken({
+                            youtube: {
+                                cookie: cookieString
+                            }
+                        });
+                        console.log(`[Music Debug] Cookies loaded into play-dl.`);
+                    }
                 } catch (cookieErr) {
-                    console.error(`[Music Debug] Error loading cookies:`, cookieErr.message);
+                    console.error(`[Music Debug] Cookie loading error:`, cookieErr.message);
                 }
+            }
+            
+            // Refresh authorization to ensure fresh tokens
+            try {
+                await play.authorization();
+            } catch (authErr) {
+                console.log(`[Music Debug] Auth refresh warning: ${authErr.message}`);
             }
 
             // Search and Stream using play-dl
