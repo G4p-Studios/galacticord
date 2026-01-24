@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus } = require('@discordjs/voice');
+const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, StreamType, VoiceConnectionStatus } = require('@discordjs/voice');
 const { ensureYtDlp, binaryPath } = require('../../utils/ytDlpHelper');
 const { spawn } = require('child_process');
 const path = require('path');
@@ -29,13 +29,25 @@ module.exports = {
                 adapterCreator: interaction.guild.voiceAdapterCreator,
             });
 
+            // Wait for connection to be ready (with a timeout)
+            try {
+                await new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => reject(new Error('Voice connection timeout')), 10000);
+                    connection.once(VoiceConnectionStatus.Ready, () => {
+                        clearTimeout(timeout);
+                        resolve();
+                    });
+                });
+            } catch (e) {
+                return interaction.editReply('Failed to connect to voice channel.');
+            }
+
             // Setup common arguments for yt-dlp
             const cookiesPath = path.resolve(process.cwd(), 'data', 'cookies.txt');
             const cachePath = path.resolve(process.cwd(), 'data', '.cache');
             
             if (!fs.existsSync(cachePath)) fs.mkdirSync(cachePath, { recursive: true });
 
-            // Using absolute Node path and removing restrictive extractor-args to fix "format not available"
             const commonArgs = [
                 '--js-runtimes', `node:${process.execPath}`,
                 '--cache-dir', cachePath,
@@ -47,8 +59,6 @@ module.exports = {
             if (fs.existsSync(cookiesPath)) {
                 console.log(`[Music Debug] SUCCESS: Found cookies.txt at: ${cookiesPath}`);
                 commonArgs.push('--cookies', cookiesPath);
-            } else {
-                console.log(`[Music Debug] WARNING: No cookies.txt found at: ${cookiesPath}`);
             }
 
             // Get Video Metadata
@@ -57,7 +67,6 @@ module.exports = {
 
             try {
                 if (!query.startsWith('http')) {
-                    console.log(`[Music Debug] Searching: ${query}`);
                     const metadata = await ytDlp.execPromise([
                         `ytsearch1:${query}`,
                         '--dump-json',
@@ -65,12 +74,10 @@ module.exports = {
                         ...commonArgs
                     ]);
                     const info = JSON.parse(metadata);
-                    // Search results are often in an 'entries' array
                     const firstEntry = info.entries ? info.entries[0] : info;
                     videoUrl = firstEntry.url || firstEntry.webpage_url;
                     videoTitle = firstEntry.title;
                 } else {
-                    console.log(`[Music Debug] Metadata fetch: ${query}`);
                     const metadata = await ytDlp.execPromise([
                         query,
                         '--dump-json',
@@ -82,47 +89,43 @@ module.exports = {
                     videoUrl = info.webpage_url;
                 }
             } catch (err) {
-                console.error("[Music Debug] yt-dlp Metadata Error:", err.message);
-                // Last ditch effort: if JSON dump fails, just use the query as the URL
-                if (query.startsWith('http')) {
-                    videoUrl = query;
-                } else {
-                    throw err;
-                }
+                if (query.startsWith('http')) videoUrl = query;
+                else throw err;
             }
 
-            console.log(`[Music Debug] Playing: ${videoTitle} (${videoUrl})`);
+            console.log(`[Music Debug] Streaming: ${videoTitle}`);
 
-            // Spawn the process natively
+            // Spawn yt-dlp to stdout
             const args = [
                 videoUrl,
                 '-o', '-',
                 '-f', 'bestaudio',
                 '--no-playlist',
-                '--retry', '3',
                 ...commonArgs
             ];
 
             const child = spawn(binaryPath, args);
 
-            const resource = createAudioResource(child.stdout);
+            // Use StreamType.Arbitrary to force ffmpeg transcoding
+            const resource = createAudioResource(child.stdout, {
+                inputType: StreamType.Arbitrary,
+                inlineVolume: true
+            });
+            
             const player = createAudioPlayer();
-
             player.play(resource);
             connection.subscribe(player);
 
+            player.on('stateChange', (oldState, newState) => {
+                console.log(`[Player Debug] State changed from ${oldState.status} to ${newState.status}`);
+            });
+
             player.on('error', error => {
-                console.error(`[AudioPlayer Error]`, error);
-                interaction.followUp({ content: 'Playback error occurred.', ephemeral: true });
+                console.error(`[AudioPlayer Error]`, error.message);
             });
             
             child.on('error', error => {
                 console.error(`[yt-dlp Process Error]`, error);
-            });
-
-            child.stderr.on('data', data => {
-                // Uncomment to see yt-dlp internal logs
-                // console.log(`[yt-dlp stderr] ${data}`);
             });
 
             await interaction.editReply(`Now playing: **${videoTitle}**`);
