@@ -101,10 +101,19 @@ async function getAudioResource(text, provider, voiceKey) {
                 }
             });
 
-            // Sanitize text: Replace newlines with ". " to ensure Piper reads everything
-            const sanitizedText = text.replace(/\n/g, '. ');
-            piperProcess.stdin.write(sanitizedText);
-            piperProcess.stdin.end();
+                                    // Sanitize text: Replace ALL whitespace sequences (newlines, tabs, etc) with a single space
+
+                                    // This ensures Piper sees one continuous stream of text on a single line.
+
+                                    const sanitizedText = text.replace(/\s+/g, ' ').trim();
+
+                                    console.log(`[Piper Debug] Final Sanitized Text (length ${sanitizedText.length}): "${sanitizedText.substring(0, 100)}${sanitizedText.length > 100 ? '...' : ''}"`);
+
+                                    
+
+                                    piperProcess.stdin.write(sanitizedText);
+
+                                    piperProcess.stdin.end();
 
             piperProcess.stderr.on('data', (data) => {
                 const msg = data.toString().trim();
