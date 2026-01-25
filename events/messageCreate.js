@@ -118,7 +118,6 @@ module.exports = {
             const serverVoice = getProp(serverSetting, 'voice');
             
             let defaultVoice = 'en-US';
-            if (mode === 'edge') defaultVoice = 'en-US-AriaNeural';
             if (mode === 'piper') defaultVoice = 'models/en_US-amy-medium.onnx';
 
             const voiceKey = userVoice || serverVoice || defaultVoice;
@@ -136,11 +135,6 @@ module.exports = {
             
             player.on('error', error => {
                 console.error(`[Player Error] Details:`, error.message);
-                if (error.message.includes("Edge TTS")) {
-                    message.reply({
-                        content: "⚠️ **Microsoft Edge TTS failed.** This service can be unreliable. Please try again later or switch to the Google provider with `/set mode provider:Google Translate`."
-                    }).catch(console.error);
-                }
             });
 
             player.on('stateChange', (oldState, newState) => {

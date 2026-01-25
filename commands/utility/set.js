@@ -48,7 +48,6 @@ module.exports = {
                         .setRequired(true)
                         .addChoices(
                             { name: 'Google Translate (Simple, Fast)', value: 'google' },
-                            { name: 'Microsoft Edge (High Quality, Many Voices)', value: 'edge' },
                             { name: 'Piper (High Quality Local TTS)', value: 'piper' }
                         )))
         .addSubcommand(subcommand =>
@@ -108,15 +107,6 @@ module.exports = {
                 name: value.label,
                 value: key
             }));
-        } else if (mode === 'edge') {
-            const voices = getEdgeVoices();
-            choices = voices.map(v => {
-                const fullName = `${v.FriendlyName} (${v.ShortName})`;
-                return {
-                    name: fullName.length > 100 ? fullName.substring(0, 97) + '...' : fullName,
-                    value: v.ShortName
-                };
-            });
         } else if (mode === 'piper') {
             const modelsDir = path.join(__dirname, '../../models');
             if (fs.existsSync(modelsDir)) {
@@ -218,7 +208,7 @@ module.exports = {
                     settings.users[interaction.user.id] = { voice: settings.users[interaction.user.id] };
                 }
                 settings.users[interaction.user.id].mode = provider;
-                const providerName = provider === 'google' ? 'Google Translate' : (provider === 'edge' ? 'Microsoft Edge' : 'Piper');
+                const providerName = provider === 'google' ? 'Google Translate' : 'Piper';
                 await interaction.reply({ content: `✅ Your TTS Provider is now: **${providerName}**` });
             } else {
                 if (!settings.servers[interaction.guild.id]) settings.servers[interaction.guild.id] = {};
@@ -226,7 +216,7 @@ module.exports = {
                     settings.servers[interaction.guild.id] = { voice: settings.servers[interaction.guild.id] };
                 }
                 settings.servers[interaction.guild.id].mode = provider;
-                const providerName = provider === 'google' ? 'Google Translate' : (provider === 'edge' ? 'Microsoft Edge' : 'Piper');
+                const providerName = provider === 'google' ? 'Google Translate' : 'Piper';
                 await interaction.reply({ content: `✅ Server Default TTS Provider is now: **${providerName}**` });
             }
 
