@@ -101,7 +101,9 @@ async function getAudioResource(text, provider, voiceKey) {
                 }
             });
 
-            piperProcess.stdin.write(text);
+            // Sanitize text: Replace newlines with ". " to ensure Piper reads everything
+            const sanitizedText = text.replace(/\n/g, '. ');
+            piperProcess.stdin.write(sanitizedText);
             piperProcess.stdin.end();
 
             piperProcess.stderr.on('data', (data) => {
