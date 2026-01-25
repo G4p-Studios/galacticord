@@ -90,6 +90,7 @@ module.exports = {
                         guildId: message.guild.id,
                         adapterCreator: message.guild.voiceAdapterCreator,
                     });
+                    console.log(`[AutoJoin] Automatically joined VC: ${targetChannel.name} for user: ${message.author.tag}`);
                     
                     connection.on('stateChange', (oldState, newState) => {
                         console.log(`[VoiceConnection AutoJoin] State changed from ${oldState.status} to ${newState.status}`);

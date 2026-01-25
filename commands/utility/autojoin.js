@@ -7,10 +7,10 @@ const configFile = path.join(__dirname, '../../data/server_config.json');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('autojoin')
-        .setDescription('Toggle auto-joining voice channels for TTS')
+        .setDescription('Configure the bot to automatically join your Voice Channel when you chat in the TTS channel.')
         .addBooleanOption(option => 
             option.setName('enabled')
-                .setDescription('Enable or disable auto-join')
+                .setDescription('True to enable auto-joining, False to disable.')
                 .setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
     async execute(interaction) {
