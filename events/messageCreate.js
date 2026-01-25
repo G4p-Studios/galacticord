@@ -112,7 +112,7 @@ module.exports = {
 
             const userMode = getProp(userSetting, 'mode');
             const serverMode = getProp(serverSetting, 'mode');
-            const mode = userMode || serverMode || 'google';
+            const mode = userMode || serverMode || 'piper';
 
             const userVoice = getProp(userSetting, 'voice');
             const serverVoice = getProp(serverSetting, 'voice');
