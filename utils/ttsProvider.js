@@ -79,11 +79,13 @@ async function getAudioResource(text, provider, voiceKey) {
             const piperPath = 'piper'; 
             const botRoot = path.resolve(__dirname, '..');
             
-            // Aggressive Fix for the 'onnx' bug
+            // Aggressive Fix for the 'onnx' bug or leftover language codes (e.g., 'en-US')
             let effectiveVoiceKey = voiceKey;
-            if (!effectiveVoiceKey || effectiveVoiceKey === 'onnx' || effectiveVoiceKey === 'undefined') {
+            const isPath = effectiveVoiceKey && (effectiveVoiceKey.endsWith('.onnx') || effectiveVoiceKey.includes('/') || effectiveVoiceKey.includes('\\'));
+            
+            if (!effectiveVoiceKey || !isPath || effectiveVoiceKey === 'onnx' || effectiveVoiceKey === 'undefined') {
                 effectiveVoiceKey = 'models/en_US-amy-medium.onnx';
-                console.log(`[Piper Debug] Invalid voiceKey ("${voiceKey}") detected. Forcing fallback to: ${effectiveVoiceKey}`);
+                console.log(`[Piper Debug] Invalid voiceKey ("${voiceKey}") detected for Piper. Forcing fallback to: ${effectiveVoiceKey}`);
             }
 
             const modelPath = path.isAbsolute(effectiveVoiceKey) ? effectiveVoiceKey : path.resolve(botRoot, effectiveVoiceKey);
