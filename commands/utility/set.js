@@ -52,11 +52,11 @@ module.exports = {
                         )))
         .addSubcommand(subcommand =>
             subcommand
-                .setName('botignore')
-                .setDescription('Set whether to ignore messages from other bots for TTS.')
+                .setName('bot')
+                .setDescription('Set whether the bot should speak messages from other bots.')
                 .addBooleanOption(option =>
-                    option.setName('enabled')
-                        .setDescription('True to ignore bots (default), False to speak bot messages.')
+                    option.setName('speak')
+                        .setDescription('True to speak bot messages, False to ignore them (default).')
                         .setRequired(true)))
         // Subcommand: Voice
         .addSubcommand(subcommand =>
@@ -163,13 +163,13 @@ module.exports = {
             const typeName = type === 'logChannel' ? 'Log Channel' : 'TTS Channel';
             await interaction.reply({ content: `✅ **${typeName}** has been set to ${channel}.` });
 
-        } else if (subcommand === 'botignore') {
-            // --- Bot Ignore Logic ---
+        } else if (subcommand === 'bot') {
+            // --- Bot Toggle Logic ---
             if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
                 return interaction.reply({ content: 'You need Manage Guild permissions to use this command.', ephemeral: true });
             }
             
-            const enabled = interaction.options.getBoolean('enabled');
+            const speak = interaction.options.getBoolean('speak');
 
             let config = {};
             try {
@@ -179,11 +179,11 @@ module.exports = {
             } catch (e) {}
 
             if (!config[interaction.guild.id]) config[interaction.guild.id] = {};
-            config[interaction.guild.id].ignoreBots = enabled;
+            config[interaction.guild.id].ignoreBots = !speak; // If speak is true, ignoreBots is false
 
             fs.writeFileSync(serverConfigFile, JSON.stringify(config, null, 2));
 
-            await interaction.reply({ content: `✅ Bot message ignoring is now **${enabled ? 'ENABLED' : 'DISABLED'}**.` });
+            await interaction.reply({ content: `✅ Bot messages will now be **${speak ? 'SPOKEN' : 'IGNORED'}**.` });
 
         } else if (subcommand === 'mode') {
             // --- Mode Logic ---

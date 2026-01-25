@@ -123,8 +123,21 @@ module.exports = {
             const voiceKey = userVoice || serverVoice || defaultVoice;
             console.log(`[MessageCreate Debug] Determined Mode: ${mode}, VoiceKey: ${voiceKey}`);
 
+            // Clean content of mentions
+            let cleanContent = message.content;
+            
+            // Replace user mentions <@ID> or <@!ID>
+            const userMentionRegex = /<@!?(\d+)>/g;
+            let match;
+            while ((match = userMentionRegex.exec(cleanContent)) !== null) {
+                const userId = match[1];
+                const member = message.guild.members.cache.get(userId);
+                const replacement = member ? member.displayName : "someone";
+                cleanContent = cleanContent.replace(match[0], replacement);
+            }
+
             // Get Resource from Provider
-            const textToSpeak = `${message.member?.displayName || message.author.username} said: ${message.content}`;
+            const textToSpeak = `${message.member?.displayName || message.author.username} said: ${cleanContent}`;
             console.log(`[MessageCreate Debug] Requesting audio resource for text: "${textToSpeak}"`);
             const resource = await getAudioResource(textToSpeak, mode, voiceKey);
             console.log(`[MessageCreate Debug] Audio resource obtained.`);
