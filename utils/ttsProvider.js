@@ -2,7 +2,10 @@ const { listVoices, Communicate } = require('edge-tts-universal');
 const googleTTS = require('google-tts-api');
 const { createAudioResource, StreamType } = require('@discordjs/voice');
 const { Readable } = require('stream');
+const { spawn } = require('child_process');
 const axios = require('axios');
+const path = require('path');
+const fs = require('fs');
 
 let edgeVoices = [];
 
@@ -70,7 +73,48 @@ async function getAudioResource(text, provider, voiceKey) {
         })();
 
         return createAudioResource(stream, { inputType: StreamType.Arbitrary });
+    
+    } else if (provider === 'piper') {
+        return new Promise((resolve, reject) => {
+            // Path to your Piper executable. Adjust if it's not in global PATH.
+            const piperPath = 'piper'; 
+            
+            // Assume voiceKey is the full path to the .onnx model, e.g., 'data/piper_models/en_US-amy-medium.onnx'
+            // Check if model exists
+            if (!fs.existsSync(voiceKey)) {
+                return reject(new Error(`Piper model not found at: ${voiceKey}`));
+            }
+
+            // Spawn Piper process
+            // Usage: echo "text" | piper --model model.onnx --output_raw
+            const piperProcess = spawn(piperPath, [
+                '--model', voiceKey,
+                '--output_raw'
+            ]);
+
+            piperProcess.stdin.write(text);
+            piperProcess.stdin.end();
+
+            piperProcess.on('error', (err) => {
+                console.error(`[Piper TTS Error] Failed to start Piper: ${err.message}`);
+                reject(new Error("Failed to start Piper TTS. Is it installed?"));
+            });
+
+            const stream = piperProcess.stdout;
+            
+            // Piper raw output is usually 16-bit mono PCM. 
+            // We can pipe it directly or let Discord.js guess. 
+            // Often specifying inputType: StreamType.Raw is safer if we knew the specific details,
+            // but Arbitrary usually works if the stream has enough data.
+            // For raw PCM, we might need to wrap it in a ffmpeg transcoder if Discord doesn't like it directly,
+            // but let's try direct first.
+            
+            resolve(createAudioResource(stream, { 
+                inputType: StreamType.Arbitrary 
+            }));
+        });
     }
+
     throw new Error("Unknown provider");
 }
 
