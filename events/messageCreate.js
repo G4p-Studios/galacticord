@@ -57,12 +57,29 @@ module.exports = {
         const isVoiceChat = message.member?.voice?.channel && message.channel.id === message.member.voice.channel.id;
 
         if (!isTTSChannel && !isVoiceChat) return; 
-        if (!message.member?.voice?.channel) return;
 
         let connection = getVoiceConnection(message.guild.id);
 
+        // If the sender is a bot, they won't be in a VC. 
+        // We should check if we are already in a VC, or if there's someone else we can join.
+        let targetChannel = message.member?.voice?.channel;
+
+        if (message.author.bot && !targetChannel) {
+            // If we're already connected, just use that.
+            if (connection) {
+                // Stay where we are
+            } else {
+                // If not connected, we can't really "follow" a bot. 
+                // We'll skip unless we are already there or have a specific channel to join.
+                return;
+            }
+        } else if (!targetChannel) {
+            // Non-bot but not in VC
+            return;
+        }
+
         // If not connected, only join if autoJoin is enabled
-        if (!connection) {
+        if (!connection && targetChannel) {
             if (autoJoin) {
                 try {
                     connection = joinVoiceChannel({
