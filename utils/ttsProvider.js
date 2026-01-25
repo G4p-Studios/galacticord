@@ -77,46 +77,58 @@ async function getAudioResource(text, provider, voiceKey) {
     } else if (provider === 'piper') {
         return new Promise((resolve, reject) => {
             const piperPath = 'piper'; 
+            const botRoot = path.resolve(__dirname, '..');
             
-            const botRoot = path.join(__dirname, '..');
-            
-            // Handle 'onnx' bug or empty voiceKey
+            // Aggressive Fix for the 'onnx' bug
             let effectiveVoiceKey = voiceKey;
-            if (effectiveVoiceKey === 'onnx' || !effectiveVoiceKey) {
+            if (!effectiveVoiceKey || effectiveVoiceKey === 'onnx' || effectiveVoiceKey === 'undefined') {
                 effectiveVoiceKey = 'models/en_US-amy-medium.onnx';
-                console.log(`[Piper Debug] Invalid/Buggy voiceKey detected. Falling back to default: ${effectiveVoiceKey}`);
+                console.log(`[Piper Debug] Invalid voiceKey ("${voiceKey}") detected. Forcing fallback to: ${effectiveVoiceKey}`);
             }
 
             const modelPath = path.isAbsolute(effectiveVoiceKey) ? effectiveVoiceKey : path.resolve(botRoot, effectiveVoiceKey);
             
-            console.log(`[Piper Debug] Resolved modelPath: "${modelPath}"`);
+            console.log(`[Piper Debug] Attempting to spawn Piper:`);
+            console.log(`  - Command: ${piperPath}`);
+            console.log(`  - Model: ${modelPath}`);
+            console.log(`  - Text: "${text.substring(0, 30)}..."`);
 
-            if (!fs.existsSync(modelPath) || !fs.statSync(modelPath).isFile()) {
-                return reject(new Error(`Piper model not found or is not a file at: ${modelPath}`));
+            if (!fs.existsSync(modelPath)) {
+                console.error(`[Piper Error] Model file NOT found at: ${modelPath}`);
+                return reject(new Error(`Piper model not found at: ${modelPath}`));
             }
 
-            // Spawn Piper process
             const piperProcess = spawn(piperPath, [
                 '--model', modelPath,
                 '--output_file', '-'
             ]);
 
+            let dataCount = 0;
+            piperProcess.stdout.on('data', (chunk) => {
+                dataCount += chunk.length;
+                if (dataCount > 0 && dataCount < 1000) { // Log once when data starts
+                    console.log(`[Piper Debug] Started receiving audio data (${chunk.length} bytes received so far)`);
+                }
+            });
+
             piperProcess.stdin.write(text);
             piperProcess.stdin.end();
 
             piperProcess.stderr.on('data', (data) => {
-                console.error(`[Piper Process Log] ${data.toString().trim()}`);
+                const msg = data.toString().trim();
+                if (msg) console.log(`[Piper Process Log] ${msg}`);
             });
 
             piperProcess.on('close', (code) => {
-                if (code !== 0 && code !== null) {
-                    console.error(`[Piper Process] Process exited with code ${code}`);
+                console.log(`[Piper Debug] Process closed with code: ${code}. Total audio data: ${dataCount} bytes.`);
+                if (dataCount === 0) {
+                    console.error(`[Piper Warning] Piper produced ZERO bytes of audio data. Check Piper logs above.`);
                 }
             });
 
             piperProcess.on('error', (err) => {
-                console.error(`[Piper TTS Error] Failed to start Piper: ${err.message}`);
-                reject(new Error("Failed to start Piper TTS. Is it installed?"));
+                console.error(`[Piper TTS Error] Failed to start Piper process: ${err.message}`);
+                reject(new Error("Failed to start Piper TTS. Please ensure 'piper' is installed and in your PATH."));
             });
 
             const stream = piperProcess.stdout;
