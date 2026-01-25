@@ -79,18 +79,23 @@ async function getAudioResource(text, provider, voiceKey) {
             const piperPath = 'piper'; 
             
             const botRoot = path.join(__dirname, '..');
-            const modelPath = path.isAbsolute(voiceKey) ? voiceKey : path.resolve(botRoot, voiceKey);
             
-            console.log(`[Piper Debug] Raw voiceKey: "${voiceKey}"`);
+            // Handle 'onnx' bug or empty voiceKey
+            let effectiveVoiceKey = voiceKey;
+            if (effectiveVoiceKey === 'onnx' || !effectiveVoiceKey) {
+                effectiveVoiceKey = 'models/en_US-amy-medium.onnx';
+                console.log(`[Piper Debug] Invalid/Buggy voiceKey detected. Falling back to default: ${effectiveVoiceKey}`);
+            }
+
+            const modelPath = path.isAbsolute(effectiveVoiceKey) ? effectiveVoiceKey : path.resolve(botRoot, effectiveVoiceKey);
+            
             console.log(`[Piper Debug] Resolved modelPath: "${modelPath}"`);
 
-            if (!fs.existsSync(modelPath)) {
-                return reject(new Error(`Piper model not found at: ${modelPath}`));
+            if (!fs.existsSync(modelPath) || !fs.statSync(modelPath).isFile()) {
+                return reject(new Error(`Piper model not found or is not a file at: ${modelPath}`));
             }
 
             // Spawn Piper process
-            // We use --output_file - to output a WAV file to stdout, 
-            // which Discord.js can easily parse compared to raw PCM.
             const piperProcess = spawn(piperPath, [
                 '--model', modelPath,
                 '--output_file', '-'
@@ -101,6 +106,12 @@ async function getAudioResource(text, provider, voiceKey) {
 
             piperProcess.stderr.on('data', (data) => {
                 console.error(`[Piper Process Log] ${data.toString().trim()}`);
+            });
+
+            piperProcess.on('close', (code) => {
+                if (code !== 0 && code !== null) {
+                    console.error(`[Piper Process] Process exited with code ${code}`);
+                }
             });
 
             piperProcess.on('error', (err) => {
