@@ -48,7 +48,8 @@ module.exports = {
                         .setRequired(true)
                         .addChoices(
                             { name: 'Google Translate (Simple, Fast)', value: 'google' },
-                            { name: 'Microsoft Edge (High Quality, Many Voices)', value: 'edge' }
+                            { name: 'Microsoft Edge (High Quality, Many Voices)', value: 'edge' },
+                            { name: 'Piper (High Quality Local TTS)', value: 'piper' }
                         )))
         .addSubcommand(subcommand =>
             subcommand
@@ -107,10 +108,8 @@ module.exports = {
                 name: value.label,
                 value: key
             }));
-        } else {
-            // Edge
+        } else if (mode === 'edge') {
             const voices = getEdgeVoices();
-            // Filter by focused value
             choices = voices.map(v => {
                 const fullName = `${v.FriendlyName} (${v.ShortName})`;
                 return {
@@ -118,6 +117,19 @@ module.exports = {
                     value: v.ShortName
                 };
             });
+        } else if (mode === 'piper') {
+            const modelsDir = path.join(__dirname, '../../models');
+            if (fs.existsSync(modelsDir)) {
+                const files = fs.readdirSync(modelsDir).filter(f => f.endsWith('.onnx'));
+                choices = files.map(f => ({
+                    name: f,
+                    value: path.join('models', f)
+                }));
+            }
+            // Always allow manual path entry if nothing found or to complement
+            if (focusedValue.includes('/') || focusedValue.includes('\\')) {
+                choices.push({ name: `Custom Path: ${focusedValue}`, value: focusedValue });
+            }
         }
 
         const filtered = choices.filter(choice => choice.name.toLowerCase().includes(focusedValue.toLowerCase()));
@@ -200,14 +212,16 @@ module.exports = {
                     settings.users[interaction.user.id] = { voice: settings.users[interaction.user.id] };
                 }
                 settings.users[interaction.user.id].mode = provider;
-                await interaction.reply({ content: `✅ Your TTS Provider is now: **${provider === 'google' ? 'Google Translate' : 'Microsoft Edge'}**` });
+                const providerName = provider === 'google' ? 'Google Translate' : (provider === 'edge' ? 'Microsoft Edge' : 'Piper');
+                await interaction.reply({ content: `✅ Your TTS Provider is now: **${providerName}**` });
             } else {
                 if (!settings.servers[interaction.guild.id]) settings.servers[interaction.guild.id] = {};
                 if (typeof settings.servers[interaction.guild.id] === 'string') {
                     settings.servers[interaction.guild.id] = { voice: settings.servers[interaction.guild.id] };
                 }
                 settings.servers[interaction.guild.id].mode = provider;
-                await interaction.reply({ content: `✅ Server Default TTS Provider is now: **${provider === 'google' ? 'Google Translate' : 'Microsoft Edge'}**` });
+                const providerName = provider === 'google' ? 'Google Translate' : (provider === 'edge' ? 'Microsoft Edge' : 'Piper');
+                await interaction.reply({ content: `✅ Server Default TTS Provider is now: **${providerName}**` });
             }
 
             fs.writeFileSync(ttsSettingsFile, JSON.stringify(settings, null, 2));
