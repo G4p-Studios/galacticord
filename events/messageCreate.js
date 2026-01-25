@@ -7,6 +7,9 @@ const { getAudioResource } = require('../utils/ttsProvider');
 const settingsFile = path.join(__dirname, '../data/tts_settings.json');
 const configFile = path.join(__dirname, '../data/server_config.json');
 
+// Global Map to store queues and players per guild
+const guildQueues = new Map();
+
 module.exports = {
     name: Events.MessageCreate,
     async execute(message) {
@@ -83,7 +86,7 @@ module.exports = {
             if (autoJoin) {
                 try {
                     connection = joinVoiceChannel({
-                        channelId: message.member.voice.channel.id,
+                        channelId: targetChannel.id,
                         guildId: message.guild.id,
                         adapterCreator: message.guild.voiceAdapterCreator,
                     });
@@ -94,7 +97,6 @@ module.exports = {
         
                     connection.on('error', (error) => {
                         console.error(`[VoiceConnection AutoJoin Error] ${error.message}`);
-                        // Don't destroy immediately in auto-join, it might recover
                     });
                 } catch (error) {
                     console.error("Failed to auto-join VC:", error);
@@ -118,7 +120,6 @@ module.exports = {
 
             const userSetting = settings.users[message.author.id];
             const serverSetting = settings.servers[message.guild.id];
-            console.log(`[MessageCreate Debug] User settings: ${JSON.stringify(userSetting)}, Server settings: ${JSON.stringify(serverSetting)}`);
 
             const getProp = (setting, prop) => {
                 if (!setting) return null;
@@ -138,7 +139,6 @@ module.exports = {
             if (mode === 'piper') defaultVoice = 'models/en_US-amy-medium.onnx';
 
             const voiceKey = userVoice || serverVoice || defaultVoice;
-            console.log(`[MessageCreate Debug] Determined Mode: ${mode}, VoiceKey: ${voiceKey}`);
 
             // Clean content of mentions
             let cleanContent = message.content;
@@ -164,25 +164,37 @@ module.exports = {
 
             // Get Resource from Provider
             const textToSpeak = `${message.member?.displayName || message.author.username} said: ${cleanContent}`;
-            console.log(`[MessageCreate Debug] Requesting audio resource for text: "${textToSpeak}"`);
             const resource = await getAudioResource(textToSpeak, mode, voiceKey);
-            console.log(`[MessageCreate Debug] Audio resource obtained.`);
 
-            // Create a new player for each message for stability
-            const player = createAudioPlayer();
-            connection.subscribe(player);
-            
-            player.on('error', error => {
-                console.error(`[Player Error] Details:`, error.message);
-            });
+            // --- Queue Implementation ---
+            if (!guildQueues.has(message.guild.id)) {
+                const player = createAudioPlayer();
+                guildQueues.set(message.guild.id, {
+                    player: player,
+                    queue: []
+                });
 
-            player.on('stateChange', (oldState, newState) => {
-                // Optional: log state changes for further debugging if needed
-                // console.log(`[Player State] ${oldState.status} -> ${newState.status}`);
-            });
+                player.on(AudioPlayerStatus.Idle, () => {
+                    const guildData = guildQueues.get(message.guild.id);
+                    if (guildData && guildData.queue.length > 0) {
+                        const nextResource = guildData.queue.shift();
+                        player.play(nextResource);
+                    }
+                });
 
-            player.play(resource);
-            console.log(`[MessageCreate Debug] Playing audio resource.`);
+                player.on('error', error => {
+                    console.error(`[Player Error Guild ${message.guild.id}] Details:`, error.message);
+                });
+            }
+
+            const guildData = guildQueues.get(message.guild.id);
+            connection.subscribe(guildData.player);
+
+            if (guildData.player.state.status === AudioPlayerStatus.Idle) {
+                guildData.player.play(resource);
+            } else {
+                guildData.queue.push(resource);
+            }
 
         } catch (error) {
             console.error('[MessageCreate Debug] Uncaught TTS Error:', error);
