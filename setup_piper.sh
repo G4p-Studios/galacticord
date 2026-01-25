@@ -37,17 +37,26 @@ fi
 
 # 3. Download Voice Model
 echo "[3/4] Downloading 'Amy' Voice Model..."
-# Navigate back to the script's directory (bot root)
-cd "$(dirname "$0")"
+# Get the absolute path of the script's directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+cd "$SCRIPT_DIR"
 
 mkdir -p models
 
 if [ ! -f "models/en_US-amy-medium.onnx" ]; then
-    wget -q --show-progress -O models/en_US-amy-medium.onnx https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx?download=true
-    wget -q --show-progress -O models/en_US-amy-medium.onnx.json https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx.json?download=true
-    echo "Model downloaded."
+    wget -q --show-progress -O models/en_US-amy-medium.onnx "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx?download=true"
+    wget -q --show-progress -O models/en_US-amy-medium.onnx.json "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx.json?download=true"
+    echo "Model downloaded to $(pwd)/models/"
 else
-    echo "Model already exists."
+    echo "Model already exists in $(pwd)/models/"
+fi
+
+# Verify file
+if [ -f "models/en_US-amy-medium.onnx" ]; then
+    echo "Verification: models/en_US-amy-medium.onnx exists."
+    ls -lh models/en_US-amy-medium.onnx
+else
+    echo "ERROR: Model download failed!"
 fi
 
 echo "---------------------------------------------------"

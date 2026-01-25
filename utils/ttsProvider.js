@@ -79,8 +79,13 @@ async function getAudioResource(text, provider, voiceKey) {
             const piperPath = 'piper'; 
             
             // Resolve the path relative to the bot root if it's not already absolute
-            const modelPath = path.isAbsolute(voiceKey) ? voiceKey : path.join(__dirname, '..', voiceKey);
+            const botRoot = path.join(__dirname, '..');
+            const modelPath = path.isAbsolute(voiceKey) ? voiceKey : path.resolve(botRoot, voiceKey);
             
+            console.log(`[Piper Debug] Raw voiceKey: "${voiceKey}"`);
+            console.log(`[Piper Debug] Resolved modelPath: "${modelPath}"`);
+            console.log(`[Piper Debug] Bot root: "${botRoot}"`);
+
             if (!fs.existsSync(modelPath)) {
                 return reject(new Error(`Piper model not found at: ${modelPath}`));
             }
