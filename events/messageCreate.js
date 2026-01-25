@@ -13,11 +13,11 @@ module.exports = {
         // We keep this one for basic entry check
         // console.log(`[MessageCreate Debug] Received message from ${message.author.tag} in #${message.channel.name}`);
         
-        if (!message.guild || message.author.bot) return;
+        if (!message.guild) return;
 
-        // Prefix command handling
+        // Prefix command handling (Only for non-bots)
         const prefix = 'mal!';
-        if (message.content.startsWith(prefix)) {
+        if (!message.author.bot && message.content.startsWith(prefix)) {
             const args = message.content.slice(prefix.length).trim().split(/ +/);
             const commandName = args.shift().toLowerCase();
 
@@ -133,6 +133,15 @@ module.exports = {
                 const userId = match[1];
                 const member = message.guild.members.cache.get(userId);
                 const replacement = member ? member.displayName : "someone";
+                cleanContent = cleanContent.replace(match[0], replacement);
+            }
+
+            // Replace channel mentions <#ID>
+            const channelMentionRegex = /<#(\d+)>/g;
+            while ((match = channelMentionRegex.exec(cleanContent)) !== null) {
+                const channelId = match[1];
+                const channel = message.guild.channels.cache.get(channelId);
+                const replacement = channel ? channel.name : "a channel";
                 cleanContent = cleanContent.replace(match[0], replacement);
             }
 
