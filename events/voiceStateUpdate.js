@@ -43,7 +43,14 @@ module.exports = {
         else if (isInChannel && oldState.serverMute !== newState.serverMute) {
             textToSpeak = `${displayName} was ${newState.serverMute ? "server muted" : "server unmuted"}.`;
         }
-        // 3. Streaming Logic
+        // 3. Deafen/Undeafen Logic
+        else if (isInChannel && oldState.selfDeaf !== newState.selfDeaf) {
+            textToSpeak = `${displayName} is now ${newState.selfDeaf ? "deafened" : "undeafened"}.`;
+        }
+        else if (isInChannel && oldState.serverDeaf !== newState.serverDeaf) {
+            textToSpeak = `${displayName} was ${newState.serverDeaf ? "server deafened" : "server undeafened"}.`;
+        }
+        // 4. Streaming Logic
         else if (isInChannel && oldState.streaming !== newState.streaming) {
             textToSpeak = `${displayName} ${newState.streaming ? "started streaming" : "stopped streaming"}.`;
         }
