@@ -1,14 +1,12 @@
 const { Events } = require('discord.js');
-const { getVoiceConnection, joinVoiceChannel, createAudioPlayer, AudioPlayerStatus } = require('@discordjs/voice');
+const { getVoiceConnection, joinVoiceChannel } = require('@discordjs/voice');
 const fs = require('fs');
 const path = require('path');
 const { getAudioResource } = require('../utils/ttsProvider');
+const { addToQueue } = require('../utils/audioQueue');
 
 const settingsFile = path.join(__dirname, '../data/tts_settings.json');
 const configFile = path.join(__dirname, '../data/server_config.json');
-
-// Global Map to store queues and players per guild
-const guildQueues = new Map();
 
 module.exports = {
     name: Events.MessageCreate,
@@ -167,35 +165,8 @@ module.exports = {
             const textToSpeak = `${message.member?.displayName || message.author.username} said: ${cleanContent}`;
             const resource = await getAudioResource(textToSpeak, mode, voiceKey);
 
-            // --- Queue Implementation ---
-            if (!guildQueues.has(message.guild.id)) {
-                const player = createAudioPlayer();
-                guildQueues.set(message.guild.id, {
-                    player: player,
-                    queue: []
-                });
-
-                player.on(AudioPlayerStatus.Idle, () => {
-                    const guildData = guildQueues.get(message.guild.id);
-                    if (guildData && guildData.queue.length > 0) {
-                        const nextResource = guildData.queue.shift();
-                        player.play(nextResource);
-                    }
-                });
-
-                player.on('error', error => {
-                    console.error(`[Player Error Guild ${message.guild.id}] Details:`, error.message);
-                });
-            }
-
-            const guildData = guildQueues.get(message.guild.id);
-            connection.subscribe(guildData.player);
-
-            if (guildData.player.state.status === AudioPlayerStatus.Idle) {
-                guildData.player.play(resource);
-            } else {
-                guildData.queue.push(resource);
-            }
+            // Add to the shared queue
+            addToQueue(message.guild.id, resource, connection);
 
         } catch (error) {
             console.error('[MessageCreate Debug] Uncaught TTS Error:', error);
