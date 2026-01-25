@@ -89,12 +89,12 @@ module.exports = {
             }
         } catch (e) {}
 
-        // Default to Google if not set
-        let mode = 'google';
+        // Default to Piper if not set
+        let mode = 'piper';
         if (target === 'user') {
-            mode = settings.users[interaction.user.id]?.mode || settings.servers[interaction.guild.id]?.mode || 'google';
+            mode = settings.users[interaction.user.id]?.mode || settings.servers[interaction.guild.id]?.mode || 'piper';
         } else {
-            mode = settings.servers[interaction.guild.id]?.mode || 'google';
+            mode = settings.servers[interaction.guild.id]?.mode || 'piper';
         }
 
         // Wait... user might be changing mode separately.
@@ -121,10 +121,16 @@ module.exports = {
             const modelsDir = path.join(__dirname, '../../models');
             if (fs.existsSync(modelsDir)) {
                 const files = fs.readdirSync(modelsDir).filter(f => f.endsWith('.onnx'));
-                choices = files.map(f => ({
-                    name: f,
-                    value: path.join('models', f)
-                }));
+                choices = files.map(f => {
+                    // Prettify name: en_US-amy-medium.onnx -> Amy (Medium)
+                    let prettyName = f.replace('.onnx', '').replace('en_US-', '').replace('en_GB-', '');
+                    prettyName = prettyName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                    
+                    return {
+                        name: prettyName,
+                        value: path.join('models', f)
+                    };
+                });
             }
             // Always allow manual path entry if nothing found or to complement
             if (focusedValue.includes('/') || focusedValue.includes('\\')) {
