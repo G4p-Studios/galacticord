@@ -116,7 +116,12 @@ module.exports = {
 
             const userVoice = getProp(userSetting, 'voice');
             const serverVoice = getProp(serverSetting, 'voice');
-            const voiceKey = userVoice || serverVoice || (mode === 'google' ? 'en-US' : 'en-US-AriaNeural');
+            
+            let defaultVoice = 'en-US';
+            if (mode === 'edge') defaultVoice = 'en-US-AriaNeural';
+            if (mode === 'piper') defaultVoice = 'models/en_US-amy-medium.onnx';
+
+            const voiceKey = userVoice || serverVoice || defaultVoice;
             console.log(`[MessageCreate Debug] Determined Mode: ${mode}, VoiceKey: ${voiceKey}`);
 
             // Get Resource from Provider

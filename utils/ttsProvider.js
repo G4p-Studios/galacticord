@@ -76,19 +76,17 @@ async function getAudioResource(text, provider, voiceKey) {
     
     } else if (provider === 'piper') {
         return new Promise((resolve, reject) => {
-            // Path to your Piper executable. Adjust if it's not in global PATH.
             const piperPath = 'piper'; 
             
-            // Assume voiceKey is the full path to the .onnx model, e.g., 'data/piper_models/en_US-amy-medium.onnx'
-            // Check if model exists
-            if (!fs.existsSync(voiceKey)) {
-                return reject(new Error(`Piper model not found at: ${voiceKey}`));
+            // Resolve the path relative to the bot root if it's not already absolute
+            const modelPath = path.isAbsolute(voiceKey) ? voiceKey : path.join(__dirname, '..', voiceKey);
+            
+            if (!fs.existsSync(modelPath)) {
+                return reject(new Error(`Piper model not found at: ${modelPath}`));
             }
 
-            // Spawn Piper process
-            // Usage: echo "text" | piper --model model.onnx --output_raw
             const piperProcess = spawn(piperPath, [
-                '--model', voiceKey,
+                '--model', modelPath,
                 '--output_raw'
             ]);
 
