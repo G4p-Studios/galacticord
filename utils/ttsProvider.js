@@ -78,25 +78,30 @@ async function getAudioResource(text, provider, voiceKey) {
         return new Promise((resolve, reject) => {
             const piperPath = 'piper'; 
             
-            // Resolve the path relative to the bot root if it's not already absolute
             const botRoot = path.join(__dirname, '..');
             const modelPath = path.isAbsolute(voiceKey) ? voiceKey : path.resolve(botRoot, voiceKey);
             
             console.log(`[Piper Debug] Raw voiceKey: "${voiceKey}"`);
             console.log(`[Piper Debug] Resolved modelPath: "${modelPath}"`);
-            console.log(`[Piper Debug] Bot root: "${botRoot}"`);
 
             if (!fs.existsSync(modelPath)) {
                 return reject(new Error(`Piper model not found at: ${modelPath}`));
             }
 
+            // Spawn Piper process
+            // We use --output_file - to output a WAV file to stdout, 
+            // which Discord.js can easily parse compared to raw PCM.
             const piperProcess = spawn(piperPath, [
                 '--model', modelPath,
-                '--output_raw'
+                '--output_file', '-'
             ]);
 
             piperProcess.stdin.write(text);
             piperProcess.stdin.end();
+
+            piperProcess.stderr.on('data', (data) => {
+                console.error(`[Piper Process Log] ${data.toString().trim()}`);
+            });
 
             piperProcess.on('error', (err) => {
                 console.error(`[Piper TTS Error] Failed to start Piper: ${err.message}`);
@@ -104,13 +109,6 @@ async function getAudioResource(text, provider, voiceKey) {
             });
 
             const stream = piperProcess.stdout;
-            
-            // Piper raw output is usually 16-bit mono PCM. 
-            // We can pipe it directly or let Discord.js guess. 
-            // Often specifying inputType: StreamType.Raw is safer if we knew the specific details,
-            // but Arbitrary usually works if the stream has enough data.
-            // For raw PCM, we might need to wrap it in a ffmpeg transcoder if Discord doesn't like it directly,
-            // but let's try direct first.
             
             resolve(createAudioResource(stream, { 
                 inputType: StreamType.Arbitrary 
