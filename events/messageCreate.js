@@ -120,8 +120,9 @@ module.exports = {
             console.log(`[MessageCreate Debug] Determined Mode: ${mode}, VoiceKey: ${voiceKey}`);
 
             // Get Resource from Provider
-            console.log(`[MessageCreate Debug] Requesting audio resource for text: "${message.content}"`);
-            const resource = await getAudioResource(message.content, mode, voiceKey);
+            const textToSpeak = `${message.member?.displayName || message.author.username} said: ${message.content}`;
+            console.log(`[MessageCreate Debug] Requesting audio resource for text: "${textToSpeak}"`);
+            const resource = await getAudioResource(textToSpeak, mode, voiceKey);
             console.log(`[MessageCreate Debug] Audio resource obtained.`);
 
             // Create a new player for each message for stability
