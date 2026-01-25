@@ -11,54 +11,65 @@ const configFile = path.join(__dirname, '../data/server_config.json');
 module.exports = {
     name: Events.VoiceStateUpdate,
     async execute(oldState, newState) {
-        // Ignore bot's own state updates (don't announce "I have joined")
+        // Ignore bot's own state updates
         if (newState.member.user.id === newState.client.user.id) return;
-
-        // Check if user joined a channel (or switched to one)
-        if (!newState.channelId) return; // User left voice
-        if (oldState.channelId === newState.channelId) return; // State update but not a channel switch (e.g. mute toggle)
 
         const guildId = newState.guild.id;
         const connection = getVoiceConnection(guildId);
 
-        // Only announce if the bot is currently connected to the SAME channel
-        if (!connection || connection.joinConfig.channelId !== newState.channelId) return;
+        // Only announce if the bot is currently connected to a channel
+        if (!connection) return;
+        const botChannelId = connection.joinConfig.channelId;
+
+        // Determine if the event is relevant to the bot's channel
+        const wasInChannel = oldState.channelId === botChannelId;
+        const isInChannel = newState.channelId === botChannelId;
+
+        if (!wasInChannel && !isInChannel) return;
+
+        let textToSpeak = "";
+        const displayName = newState.member.displayName;
+
+        // 1. Join/Leave/Switch Logic
+        if (!wasInChannel && isInChannel) {
+            textToSpeak = `${displayName} has joined the channel.`;
+        } else if (wasInChannel && !isInChannel) {
+            textToSpeak = `${displayName} has left the channel.`;
+        } 
+        // 2. Mute/Unmute Logic (Only if they are in the channel)
+        else if (isInChannel && oldState.selfMute !== newState.selfMute) {
+            textToSpeak = `${displayName} is now ${newState.selfMute ? "muted" : "unmuted"}.`;
+        }
+        else if (isInChannel && oldState.serverMute !== newState.serverMute) {
+            textToSpeak = `${displayName} was ${newState.serverMute ? "server muted" : "server unmuted"}.`;
+        }
+        // 3. Streaming Logic
+        else if (isInChannel && oldState.streaming !== newState.streaming) {
+            textToSpeak = `${displayName} ${newState.streaming ? "started streaming" : "stopped streaming"}.`;
+        }
+
+        if (!textToSpeak) return;
 
         try {
-            // Load Server Config for settings
+            // Load Settings
             let settings = { users: {}, servers: {} };
             try {
                 if (fs.existsSync(settingsFile)) {
                     settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
                 }
-            } catch (e) {
-                console.error(`[VoiceStateUpdate] Error reading settings: ${e.message}`);
-            }
+            } catch (e) {}
 
-            // Use Server Settings or Default (Piper)
             const serverSetting = settings.servers[guildId];
             const mode = serverSetting?.mode || 'piper';
-            
-            // Determine voice
-            let defaultVoice = 'en-US';
-            if (mode === 'piper') defaultVoice = 'models/en_US-amy-medium.onnx';
-            
+            let defaultVoice = mode === 'piper' ? 'models/en_US-amy-medium.onnx' : 'en-US';
             const voiceKey = serverSetting?.voice || defaultVoice;
 
-            // Generate Announcement Text
-            const displayName = newState.member.displayName;
-            const textToSpeak = `${displayName} has joined the channel.`;
-
-            console.log(`[VoiceJoin] Announcing: "${textToSpeak}"`);
-            
-            // Get Audio
+            console.log(`[VoiceEvent] ${textToSpeak}`);
             const resource = await getAudioResource(textToSpeak, mode, voiceKey);
-
-            // Add to Queue
             addToQueue(guildId, resource, connection);
 
         } catch (error) {
-            console.error('[VoiceStateUpdate] Error announcing join:', error);
+            console.error('[VoiceStateUpdate] Error:', error);
         }
     },
 };
