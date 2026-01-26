@@ -97,11 +97,20 @@ async function getAudioStream(text, provider, voiceKey) {
             const voice = cleanVoiceKey || 'en-us';
             
             return new Promise((resolve, reject) => {
-                // espeak-ng reads from stdin if no text argument is provided
+                console.log(`[eSpeak Debug] Spawning: ${espeakPath} -v ${voice} --stdout`);
                 const espeakProcess = spawn(espeakPath, ['-v', voice, '--stdout']);
                 
+                let dataCount = 0;
+                espeakProcess.stdout.on('data', (chunk) => {
+                    dataCount += chunk.length;
+                });
+
                 espeakProcess.stderr.on('data', (data) => {
                     console.error(`[eSpeak Engine Log] ${data.toString().trim()}`);
+                });
+
+                espeakProcess.on('close', (code) => {
+                    console.log(`[eSpeak Debug] Process closed with code ${code}. Total data: ${dataCount} bytes.`);
                 });
 
                 espeakProcess.on('error', (err) => reject(new Error(`Failed to start espeak-ng: ${err.message}`)));
@@ -117,7 +126,18 @@ async function getAudioStream(text, provider, voiceKey) {
             const voice = cleanVoiceKey || 'alan';
 
             return new Promise((resolve, reject) => {
+                console.log(`[RHVoice Debug] Spawning: ${rhvoicePath} -p ${voice} -o -`);
                 const rhvoiceProcess = spawn(rhvoicePath, ['-p', voice, '-o', '-']);
+                
+                let dataCount = 0;
+                rhvoiceProcess.stdout.on('data', (chunk) => {
+                    dataCount += chunk.length;
+                });
+
+                rhvoiceProcess.on('close', (code) => {
+                    console.log(`[RHVoice Debug] Process closed with code ${code}. Total data: ${dataCount} bytes.`);
+                });
+
                 rhvoiceProcess.on('error', (err) => reject(new Error(`Failed to start RHVoice: ${err.message}`)));
                 rhvoiceProcess.stdin.write(sanitizedText + '\n');
                 rhvoiceProcess.stdin.end();
