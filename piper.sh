@@ -41,13 +41,15 @@ VOICES=(
     "en_US-joe-medium"
 )
 
-# Retro Voices
+# Retro and Special Voices
+# Source: https://nashcentral.duckdns.org/spres/piper/
 RETRO_VOICES=(
-    "retro-vocal-tract"
-    "retro-klatt"
-    "retro-speakjet"
-    "retro-sam"
-    "retro-dec-talk"
+    "en_US-glados-medium"
+    "en_US-zarvox-medium"
+    "en_US-votrax-medium"
+    "en_US-speak_and_spell_new-medium"
+    "en_US-spongebob-high"
+    "en_US-cortana-medium"
 )
 
 download_voice() {
@@ -63,8 +65,12 @@ download_voice() {
 
     if [ ! -f "models/${name}.onnx" ]; then
         echo "Downloading ${name}..."
-        wget -q --show-progress -O "models/${name}.onnx" "$url_onnx"
-        wget -q --show-progress -O "models/${name}.onnx.json" "$url_json"
+        # Check if URL already has query params, if not add ?download=true
+        local q=""
+        [[ "$url_onnx" != *"?"* ]] && q="?download=true"
+        
+        wget -q --show-progress -O "models/${name}.onnx" "${url_onnx}${q}"
+        wget -q --show-progress -O "models/${name}.onnx.json" "${url_json}${q}"
     else
         echo "Voice ${name} already exists."
     fi
@@ -85,16 +91,12 @@ for voice in "${VOICES[@]}"; do
         "https://huggingface.co/rhasspy/piper-voices/resolve/main/${B}/${voice}.onnx.json?download=true"
 done
 
-# Process Retro Voices
+# Process Retro and Special Voices from NashCentral
+BASE_URL="https://nashcentral.duckdns.org/spres/piper"
 for voice in "${RETRO_VOICES[@]}"; do
-    case $voice in
-        "retro-sam") U="https://huggingface.co/eurpod/retro-speech-synthesizers/resolve/main/retro-sam" ;;
-        "retro-dec-talk") U="https://huggingface.co/eurpod/retro-speech-synthesizers/resolve/main/retro-dec-talk" ;;
-        "retro-speakjet") U="https://huggingface.co/eurpod/retro-speech-synthesizers/resolve/main/retro-speakjet" ;;
-        "retro-klatt") U="https://huggingface.co/eurpod/retro-speech-synthesizers/resolve/main/retro-klatt" ;;
-        "retro-vocal-tract") U="https://huggingface.co/eurpod/retro-speech-synthesizers/resolve/main/retro-vocal-tract" ;;
-    esac
-    download_voice "$voice" "${U}.onnx?download=true" "${U}.onnx.json?download=true"
+    download_voice "$voice" \
+        "${BASE_URL}/${voice}.onnx" \
+        "${BASE_URL}/${voice}.onnx.json"
 done
 
 echo "---------------------------------------------------"
