@@ -13,8 +13,11 @@ function getEdgeVoices() {
 
 function resolvePath(command) {
     try {
-        return execSync(`which ${command}`).toString().trim();
+        const fullPath = execSync(`which ${command}`).toString().trim();
+        console.log(`[Path Debug] Resolved ${command} to: ${fullPath}`);
+        return fullPath;
     } catch (e) {
+        console.error(`[Path Debug] Failed to resolve ${command} using which. Falling back to: ${command}`);
         return command; // Fallback to name if which fails
     }
 }
