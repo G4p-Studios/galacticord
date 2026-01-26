@@ -10,11 +10,20 @@ function getEdgeVoices() { return []; }
 
 /**
  * The ultimate cleaner. Converts ALL Unicode dashes to ASCII hyphens.
+ * Uses explicit hex codes to ensure no character encoding issues.
  */
 function ultimateClean(str) {
     if (typeof str !== 'string') return str;
-    // Replace ALL known Unicode dash variations with a standard short dash (-)
-    return str.replace(/[‐‑‒–—―−⁃]/g, '-').trim();
+    return str
+        .replace(/\u2010/g, '-') // Hyphen
+        .replace(/\u2011/g, '-') // Non-breaking hyphen
+        .replace(/\u2012/g, '-') // Figure dash
+        .replace(/\u2013/g, '-') // En dash
+        .replace(/\u2014/g, '-') // Em dash
+        .replace(/\u2015/g, '-') // Horizontal bar
+        .replace(/\u2212/g, '-') // Minus sign
+        .replace(/\u2043/g, '-') // Hyphen bullet
+        .trim();
 }
 
 function resolvePath(command) {
