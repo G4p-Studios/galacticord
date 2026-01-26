@@ -57,27 +57,41 @@ async function getAudioStream(text, provider, voiceKey) {
 
         return piperProcess.stdout;
     } else if (provider === 'espeak') {
-        // eSpeak-ng usage: espeak-ng -v [voice] --stdout "text"
-        const espeakPath = 'espeak-ng';
-        const voice = voiceKey || 'en-us';
-        const sanitizedText = text.replace(/\s+/g, ' ').trim();
-        
-        const espeakProcess = spawn(espeakPath, ['-v', voice, '--stdout', sanitizedText]);
-        
-        return espeakProcess.stdout;
+        return new Promise((resolve, reject) => {
+            const espeakPath = 'espeak-ng';
+            const voice = voiceKey || 'en-us';
+            const sanitizedText = text.replace(/\s+/g, ' ').trim();
+            
+            console.log(`[eSpeak Debug] Spawning: ${espeakPath} -v ${voice}`);
+            const espeakProcess = spawn(espeakPath, ['-v', voice, '--stdout', sanitizedText]);
+            
+            espeakProcess.on('error', (err) => {
+                console.error(`[eSpeak TTS Error] Failed to start espeak-ng: ${err.message}`);
+                reject(new Error("Failed to start eSpeak-ng. Is it installed and executable?"));
+            });
+
+            resolve(espeakProcess.stdout);
+        });
 
     } else if (provider === 'rhvoice') {
-        // RHVoice usage: RHVoice-test -p [voice] -o -
-        const rhvoicePath = 'RHVoice-test';
-        const voice = voiceKey || 'alan';
-        const sanitizedText = text.replace(/\s+/g, ' ').trim();
+        return new Promise((resolve, reject) => {
+            const rhvoicePath = 'RHVoice-test';
+            const voice = voiceKey || 'alan';
+            const sanitizedText = text.replace(/\s+/g, ' ').trim();
 
-        const rhvoiceProcess = spawn(rhvoicePath, ['-p', voice, '-o', '-']);
-        
-        rhvoiceProcess.stdin.write(sanitizedText + '\n');
-        rhvoiceProcess.stdin.end();
+            console.log(`[RHVoice Debug] Spawning: ${rhvoicePath} -p ${voice}`);
+            const rhvoiceProcess = spawn(rhvoicePath, ['-p', voice, '-o', '-']);
+            
+            rhvoiceProcess.on('error', (err) => {
+                console.error(`[RHVoice TTS Error] Failed to start RHVoice: ${err.message}`);
+                reject(new Error("Failed to start RHVoice. Is it installed and executable?"));
+            });
 
-        return rhvoiceProcess.stdout;
+            rhvoiceProcess.stdin.write(sanitizedText + '\n');
+            rhvoiceProcess.stdin.end();
+
+            resolve(rhvoiceProcess.stdout);
+        });
     }
     throw new Error("Unknown provider");
 }
