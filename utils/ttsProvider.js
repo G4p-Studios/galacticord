@@ -82,6 +82,11 @@ async function getAudioStream(text, provider, voiceKey) {
             if (!fs.existsSync(modelPath)) throw new Error(`Piper model not found: ${modelPath}`);
 
             const piperProcess = spawn(piperPath, ['--model', modelPath, '--output_file', '-']);
+            
+            piperProcess.stderr.on('data', (data) => {
+                console.error(`[Piper Engine Log] ${data.toString().trim()}`);
+            });
+
             piperProcess.stdin.write(sanitizedText + '\n');
             piperProcess.stdin.end();
 
@@ -92,8 +97,18 @@ async function getAudioStream(text, provider, voiceKey) {
             const voice = cleanVoiceKey || 'en-us';
             
             return new Promise((resolve, reject) => {
-                const espeakProcess = spawn(espeakPath, ['-v', voice, '--stdout', sanitizedText]);
+                // espeak-ng reads from stdin if no text argument is provided
+                const espeakProcess = spawn(espeakPath, ['-v', voice, '--stdout']);
+                
+                espeakProcess.stderr.on('data', (data) => {
+                    console.error(`[eSpeak Engine Log] ${data.toString().trim()}`);
+                });
+
                 espeakProcess.on('error', (err) => reject(new Error(`Failed to start espeak-ng: ${err.message}`)));
+                
+                espeakProcess.stdin.write(sanitizedText + '\n');
+                espeakProcess.stdin.end();
+
                 resolve(espeakProcess.stdout);
             });
 
