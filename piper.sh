@@ -41,17 +41,6 @@ VOICES=(
     "en_US-joe-medium"
 )
 
-# Retro and Special Voices
-# Source: https://nashcentral.duckdns.org/spres/piper/
-RETRO_VOICES=(
-    "en_US-glados-medium"
-    "en_US-zarvox-medium"
-    "en_US-votrax-medium"
-    "en_US-speak_and_spell_new-medium"
-    "en_US-spongebob-high"
-    "en_US-cortana-medium"
-)
-
 download_voice() {
     local name=$1
     local url_onnx=$2
@@ -65,7 +54,6 @@ download_voice() {
 
     if [ ! -f "models/${name}.onnx" ]; then
         echo "Downloading ${name}..."
-        # Check if URL already has query params, if not add ?download=true
         local q=""
         [[ "$url_onnx" != *"?"* ]] && q="?download=true"
         
@@ -76,7 +64,7 @@ download_voice() {
     fi
 }
 
-# Process US Voices
+# Process US Voices (Standard HuggingFace)
 for voice in "${VOICES[@]}"; do
     case $voice in
         "en_US-amy-medium") B="en/en_US/amy/medium" ;; 
@@ -91,9 +79,14 @@ for voice in "${VOICES[@]}"; do
         "https://huggingface.co/rhasspy/piper-voices/resolve/main/${B}/${voice}.onnx.json?download=true"
 done
 
-# Process Retro and Special Voices from NashCentral
+# Process All Voices from NashCentral
 BASE_URL="https://nashcentral.duckdns.org/spres/piper"
-for voice in "${RETRO_VOICES[@]}"; do
+echo "[3.5/4] Scrapping and downloading all voices from NashCentral..."
+
+# Fetch the page, extract links ending in .onnx, and remove the extension to get names
+NASH_VOICES=$(curl -s "${BASE_URL}/" | grep -oP 'href="\K[^"]+\.onnx(?=")' | sed 's/\.onnx//')
+
+for voice in $NASH_VOICES; do
     download_voice "$voice" \
         "${BASE_URL}/${voice}.onnx" \
         "${BASE_URL}/${voice}.onnx.json"
