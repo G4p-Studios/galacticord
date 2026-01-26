@@ -1,14 +1,13 @@
 const googleTTS = require('google-tts-api');
 const { createAudioResource, StreamType } = require('@discordjs/voice');
-const { spawn } = require('child_process');
-const axios = require('axios');
-const path = require('path');
-const fs = require('fs');
+const { spawn, execSync } = require('child_process');
 
-async function init() {}
-
-function getEdgeVoices() {
-    return [];
+function resolvePath(command) {
+    try {
+        return execSync(`which ${command}`).toString().trim();
+    } catch (e) {
+        return command; // Fallback to name if which fails
+    }
 }
 
 async function getAudioStream(text, provider, voiceKey) {
@@ -58,15 +57,15 @@ async function getAudioStream(text, provider, voiceKey) {
         return piperProcess.stdout;
     } else if (provider === 'espeak') {
         return new Promise((resolve, reject) => {
-            const espeakPath = 'espeak-ng';
+            const espeakPath = resolvePath('espeak-ng');
             const voice = voiceKey || 'en-us';
             const sanitizedText = text.replace(/\s+/g, ' ').trim();
             
-            console.log(`[eSpeak Debug] Spawning: ${espeakPath} -v ${voice}`);
+            console.log(`[eSpeak Debug] Spawning absolute path: ${espeakPath} -v ${voice}`);
             const espeakProcess = spawn(espeakPath, ['-v', voice, '--stdout', sanitizedText]);
             
             espeakProcess.on('error', (err) => {
-                console.error(`[eSpeak TTS Error] Failed to start espeak-ng: ${err.message}`);
+                console.error(`[eSpeak TTS Error] Failed to start espeak-ng at ${espeakPath}: ${err.message}`);
                 reject(new Error("Failed to start eSpeak-ng. Is it installed and executable?"));
             });
 
@@ -75,15 +74,15 @@ async function getAudioStream(text, provider, voiceKey) {
 
     } else if (provider === 'rhvoice') {
         return new Promise((resolve, reject) => {
-            const rhvoicePath = 'RHVoice-test';
+            const rhvoicePath = resolvePath('RHVoice-test');
             const voice = voiceKey || 'alan';
             const sanitizedText = text.replace(/\s+/g, ' ').trim();
 
-            console.log(`[RHVoice Debug] Spawning: ${rhvoicePath} -p ${voice}`);
+            console.log(`[RHVoice Debug] Spawning absolute path: ${rhvoicePath} -p ${voice}`);
             const rhvoiceProcess = spawn(rhvoicePath, ['-p', voice, '-o', '-']);
             
             rhvoiceProcess.on('error', (err) => {
-                console.error(`[RHVoice TTS Error] Failed to start RHVoice: ${err.message}`);
+                console.error(`[RHVoice TTS Error] Failed to start RHVoice at ${rhvoicePath}: ${err.message}`);
                 reject(new Error("Failed to start RHVoice. Is it installed and executable?"));
             });
 
