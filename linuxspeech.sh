@@ -29,6 +29,21 @@ else
     echo "RHVoice is already installed."
 fi
 
+# Fix permissions automatically
+echo "[4/4] Fixing permissions for TTS engines..."
+ESPEAK_PATH=$(which espeak-ng)
+RHVOICE_PATH=$(which RHVoice-test)
+
+if [ -n "$ESPEAK_PATH" ]; then
+    echo "Applying permissions to: $ESPEAK_PATH"
+    sudo chmod +x "$ESPEAK_PATH"
+fi
+
+if [ -n "$RHVOICE_PATH" ]; then
+    echo "Applying permissions to: $RHVOICE_PATH"
+    sudo chmod +x "$RHVOICE_PATH"
+fi
+
 echo "---------------------------------------------------"
 echo "Setup Complete!"
 echo ""
