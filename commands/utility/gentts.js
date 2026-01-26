@@ -14,7 +14,9 @@ module.exports = {
                 .setRequired(true)
                 .addChoices(
                     { name: 'Google Translate', value: 'google' },
-                    { name: 'Piper (High Quality)', value: 'piper' }
+                    { name: 'Piper (High Quality)', value: 'piper' },
+                    { name: 'eSpeak-ng (Classic Synth)', value: 'espeak' },
+                    { name: 'RHVoice (Local Natural)', value: 'rhvoice' }
                 ))
         .addStringOption(option =>
             option.setName('voice')
@@ -49,6 +51,18 @@ module.exports = {
                     };
                 });
             }
+        } else if (mode === 'espeak') {
+            choices = [
+                { name: 'English (US)', value: 'en-us' },
+                { name: 'English (UK)', value: 'en-gb' },
+                { name: 'Spanish', value: 'es' },
+                { name: 'French', value: 'fr' }
+            ];
+        } else if (mode === 'rhvoice') {
+            choices = [
+                { name: 'Alan (English)', value: 'alan' },
+                { name: 'Aleksandr (Russian)', value: 'aleksandr' }
+            ];
         }
 
         const filtered = choices.filter(choice => choice.name.toLowerCase().includes(focusedValue.toLowerCase()));

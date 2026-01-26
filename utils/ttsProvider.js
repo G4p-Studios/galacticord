@@ -56,6 +56,28 @@ async function getAudioStream(text, provider, voiceKey) {
         piperProcess.stdin.end();
 
         return piperProcess.stdout;
+    } else if (provider === 'espeak') {
+        // eSpeak-ng usage: espeak-ng -v [voice] --stdout "text"
+        const espeakPath = 'espeak-ng';
+        const voice = voiceKey || 'en-us';
+        const sanitizedText = text.replace(/\s+/g, ' ').trim();
+        
+        const espeakProcess = spawn(espeakPath, ['-v', voice, '--stdout', sanitizedText]);
+        
+        return espeakProcess.stdout;
+
+    } else if (provider === 'rhvoice') {
+        // RHVoice usage: RHVoice-test -p [voice] -o -
+        const rhvoicePath = 'RHVoice-test';
+        const voice = voiceKey || 'alan';
+        const sanitizedText = text.replace(/\s+/g, ' ').trim();
+
+        const rhvoiceProcess = spawn(rhvoicePath, ['-p', voice, '-o', '-']);
+        
+        rhvoiceProcess.stdin.write(sanitizedText + '\n');
+        rhvoiceProcess.stdin.end();
+
+        return rhvoiceProcess.stdout;
     }
     throw new Error("Unknown provider");
 }

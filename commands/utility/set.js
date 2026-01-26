@@ -48,7 +48,9 @@ module.exports = {
                         .setRequired(true)
                         .addChoices(
                             { name: 'Google Translate (Simple, Fast)', value: 'google' },
-                            { name: 'Piper (High Quality Local TTS)', value: 'piper' }
+                            { name: 'Piper (High Quality Local TTS)', value: 'piper' },
+                            { name: 'eSpeak-ng (Classic Synth)', value: 'espeak' },
+                            { name: 'RHVoice (Natural local voices)', value: 'rhvoice' }
                         )))
         .addSubcommand(subcommand =>
             subcommand
@@ -126,6 +128,27 @@ module.exports = {
             if (focusedValue.includes('/') || focusedValue.includes('\\')) {
                 choices.push({ name: `Custom Path: ${focusedValue}`, value: focusedValue });
             }
+        } else if (mode === 'espeak') {
+            choices = [
+                { name: 'English (US)', value: 'en-us' },
+                { name: 'English (UK)', value: 'en-gb' },
+                { name: 'Spanish', value: 'es' },
+                { name: 'French', value: 'fr' },
+                { name: 'German', value: 'de' },
+                { name: 'Russian', value: 'ru' },
+                { name: 'Polish', value: 'pl' },
+                { name: 'Italian', value: 'it' }
+            ];
+        } else if (mode === 'rhvoice') {
+            choices = [
+                { name: 'Alan (English)', value: 'alan' },
+                { name: 'Bcl (English)', value: 'bdl' },
+                { name: 'Slt (English)', value: 'slt' },
+                { name: 'Aleksandr (Russian)', value: 'aleksandr' },
+                { name: 'Anna (Russian)', value: 'anna' },
+                { name: 'Elena (Russian)', value: 'elena' },
+                { name: 'Irina (Russian)', value: 'irina' }
+            ];
         }
 
         const filtered = choices.filter(choice => choice.name.toLowerCase().includes(focusedValue.toLowerCase()));
@@ -208,7 +231,8 @@ module.exports = {
                     settings.users[interaction.user.id] = { voice: settings.users[interaction.user.id] };
                 }
                 settings.users[interaction.user.id].mode = provider;
-                const providerName = provider === 'google' ? 'Google Translate' : 'Piper';
+                const providerMap = { 'google': 'Google Translate', 'piper': 'Piper', 'espeak': 'eSpeak-ng', 'rhvoice': 'RHVoice' };
+                const providerName = providerMap[provider] || provider;
                 await interaction.reply({ content: `✅ Your TTS Provider is now: **${providerName}**` });
             } else {
                 if (!settings.servers[interaction.guild.id]) settings.servers[interaction.guild.id] = {};
@@ -216,7 +240,8 @@ module.exports = {
                     settings.servers[interaction.guild.id] = { voice: settings.servers[interaction.guild.id] };
                 }
                 settings.servers[interaction.guild.id].mode = provider;
-                const providerName = provider === 'google' ? 'Google Translate' : 'Piper';
+                const providerMap = { 'google': 'Google Translate', 'piper': 'Piper', 'espeak': 'eSpeak-ng', 'rhvoice': 'RHVoice' };
+                const providerName = providerMap[provider] || provider;
                 await interaction.reply({ content: `✅ Server Default TTS Provider is now: **${providerName}**` });
             }
 
