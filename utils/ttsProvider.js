@@ -1,6 +1,15 @@
 const googleTTS = require('google-tts-api');
 const { createAudioResource, StreamType } = require('@discordjs/voice');
 const { spawn, execSync } = require('child_process');
+const axios = require('axios');
+const path = require('path');
+const fs = require('fs');
+
+async function init() {}
+
+function getEdgeVoices() {
+    return [];
+}
 
 function resolvePath(command) {
     try {
