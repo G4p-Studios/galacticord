@@ -70,7 +70,7 @@ async function getAudioStream(text, provider, voiceKey) {
             let effectiveVoiceKey = (typeof cleanVoiceKey === 'string') ? cleanVoiceKey.trim() : 'models/en_US-amy-medium.onnx';
             
             const isModelFile = effectiveVoiceKey.endsWith('.onnx');
-            const hasPath = effectiveVoiceKey.includes('/') || effectiveVoiceKey.includes('\');
+            const hasPath = effectiveVoiceKey.includes('/') || effectiveVoiceKey.includes('\\');
 
             if (!effectiveVoiceKey || effectiveVoiceKey === 'onnx' || effectiveVoiceKey === 'undefined' || (!isModelFile && !hasPath)) {
                 effectiveVoiceKey = 'models/en_US-amy-medium.onnx';
