@@ -11,21 +11,38 @@ function getEdgeVoices() {
     return [];
 }
 
+function normalizeDashes(str) {
+    if (typeof str !== 'string') return str;
+    // Replace em-dash (—) and en-dash (–) with standard hyphen (-)
+    return str.replace(/[—–]/g, '-');
+}
+
 function resolvePath(command) {
+    const cmd = normalizeDashes(command);
     try {
-        const fullPath = execSync(`which ${command}`).toString().trim();
-        console.log(`[Path Debug] Resolved ${command} to: ${fullPath}`);
+        const fullPath = execSync(`which ${cmd}`).toString().trim();
+        console.log(`[Path Debug] Resolved ${cmd} to: ${fullPath}`);
         return fullPath;
     } catch (e) {
-        console.error(`[Path Debug] Failed to resolve ${command} using which. Falling back to: ${command}`);
-        return command; // Fallback to name if which fails
+        // Try common linux paths as fallback
+        const commonPaths = [`/usr/bin/${cmd}`, `/usr/local/bin/${cmd}`, `/usr/sbin/${cmd}`];
+        for (const p of commonPaths) {
+            if (fs.existsSync(p)) {
+                console.log(`[Path Debug] Found ${cmd} at common location: ${p}`);
+                return p;
+            }
+        }
+        console.error(`[Path Debug] Failed to resolve ${cmd}. Falling back to: ${cmd}`);
+        return cmd; 
     }
 }
 
 async function getAudioStream(text, provider, voiceKey) {
+    const cleanVoiceKey = normalizeDashes(voiceKey);
+    
     if (provider === 'google') {
         const voiceOptions = require('./voiceConstants');
-        const voiceConfig = voiceOptions[voiceKey] || voiceOptions['en-US'];
+        const voiceConfig = voiceOptions[cleanVoiceKey] || voiceOptions['en-US'];
         const textToProcess = text.substring(0, 2000);
 
         if (textToProcess.length <= 200) {
@@ -48,9 +65,11 @@ async function getAudioStream(text, provider, voiceKey) {
     } else if (provider === 'piper') {
         const piperPath = 'piper';
         const botRoot = path.resolve(__dirname, '..');
-        let effectiveVoiceKey = (typeof voiceKey === 'string') ? voiceKey.trim() : 'models/en_US-amy-medium.onnx';
+        
+        let effectiveVoiceKey = (typeof cleanVoiceKey === 'string') ? cleanVoiceKey.trim() : 'models/en_US-amy-medium.onnx';
+        
         const isModelFile = effectiveVoiceKey.endsWith('.onnx');
-        const hasPath = effectiveVoiceKey.includes('/') || effectiveVoiceKey.includes('\\');
+        const hasPath = effectiveVoiceKey.includes('/') || effectiveVoiceKey.includes('\');
 
         if (!effectiveVoiceKey || effectiveVoiceKey === 'onnx' || effectiveVoiceKey === 'undefined' || (!isModelFile && !hasPath)) {
             effectiveVoiceKey = 'models/en_US-amy-medium.onnx';
@@ -70,7 +89,7 @@ async function getAudioStream(text, provider, voiceKey) {
     } else if (provider === 'espeak') {
         return new Promise((resolve, reject) => {
             const espeakPath = resolvePath('espeak-ng');
-            const voice = voiceKey || 'en-us';
+            const voice = cleanVoiceKey || 'en-us';
             const sanitizedText = text.replace(/\s+/g, ' ').trim();
             
             console.log(`[eSpeak Debug] Spawning absolute path: ${espeakPath} -v ${voice}`);
@@ -87,7 +106,7 @@ async function getAudioStream(text, provider, voiceKey) {
     } else if (provider === 'rhvoice') {
         return new Promise((resolve, reject) => {
             const rhvoicePath = resolvePath('RHVoice-test');
-            const voice = voiceKey || 'alan';
+            const voice = cleanVoiceKey || 'alan';
             const sanitizedText = text.replace(/\s+/g, ' ').trim();
 
             console.log(`[RHVoice Debug] Spawning absolute path: ${rhvoicePath} -p ${voice}`);
