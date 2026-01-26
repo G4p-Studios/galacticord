@@ -13,35 +13,33 @@ function getEdgeVoices() {
 
 /**
  * Normalizes all variations of dashes/hyphens to a standard ASCII hyphen.
- * This prevents path and command execution errors on some systems.
  */
 function normalizeDashes(str) {
     if (typeof str !== 'string') return str;
-    // Replace all Unicode dash variations (\u2010 to \u2015) with ASCII hyphen (\u002d)
-    return str.replace(/[‐‑‒–—―]/g, '\u002d');
+    // Replace ALL Unicode dash/hyphen variations with standard ASCII hyphen (-)
+    return str.replace(/[‐-―]/g, '-').replace(/—/g, '-').replace(/–/g, '-');
 }
 
 /**
- * Resolves the absolute path of a command, checking common Linux locations as fallbacks.
+ * Resolves the absolute path of a command.
  */
 function resolvePath(command) {
     const cmd = normalizeDashes(command);
     try {
-        // Try 'which' first
         const fullPath = execSync(`which ${cmd}`).toString().trim();
-        return fullPath;
+        return normalizeDashes(fullPath);
     } catch (e) {
-        // Search common Linux binary paths
         const searchPaths = ['/usr/bin', '/usr/local/bin', '/usr/sbin', '/bin'];
         for (const dir of searchPaths) {
             const p = path.join(dir, cmd);
-            if (fs.existsSync(p)) return p;
+            if (fs.existsSync(p)) return normalizeDashes(p);
         }
-        return cmd; // Fallback to raw name if not found
+        return cmd; 
     }
 }
 
 async function getAudioStream(text, provider, voiceKey) {
+    // Aggressively clean all inputs
     const cleanVoiceKey = normalizeDashes(voiceKey);
     const sanitizedText = text.replace(/\s+/g, ' ').trim();
 
@@ -51,69 +49,57 @@ async function getAudioStream(text, provider, voiceKey) {
             const voiceConfig = voiceOptions[cleanVoiceKey] || voiceOptions['en-US'];
             const textToProcess = text.substring(0, 2000);
 
-            if (textToProcess.length <= 200) {
-                const url = googleTTS.getAudioUrl(textToProcess, {
-                    lang: voiceConfig.lang,
-                    slow: false,
-                    host: voiceConfig.host,
-                });
-                const response = await axios.get(url, { responseType: 'stream' });
-                return response.data;
-            } else {
-                const results = googleTTS.getAllAudioUrls(textToProcess, {
-                    lang: voiceConfig.lang,
-                    slow: false,
-                    host: voiceConfig.host,
-                });
-                const response = await axios.get(results[0].url, { responseType: 'stream' });
-                return response.data;
-            }
+            const url = googleTTS.getAudioUrl(textToProcess, {
+                lang: voiceConfig.lang || 'en',
+                slow: false,
+                host: voiceConfig.host || 'https://translate.google.com',
+            });
+            const response = await axios.get(url, { responseType: 'stream' });
+            return response.data;
 
         } else if (provider === 'piper') {
             const piperPath = resolvePath('piper');
             const botRoot = path.resolve(__dirname, '..');
             
-            let effectiveVoiceKey = (typeof cleanVoiceKey === 'string') ? cleanVoiceKey.trim() : 'models/en_US-amy-medium.onnx';
-            if (!effectiveVoiceKey.endsWith('.onnx')) {
-                effectiveVoiceKey = 'models/en_US-amy-medium.onnx';
-            }
+            let v = (typeof cleanVoiceKey === 'string') ? cleanVoiceKey.trim() : 'models/en_US-amy-medium.onnx';
+            if (!v.endsWith('.onnx')) v = 'models/en_US-amy-medium.onnx';
 
-            const modelPath = path.isAbsolute(effectiveVoiceKey) ? effectiveVoiceKey : path.resolve(botRoot, effectiveVoiceKey);
+            const modelPath = path.isAbsolute(v) ? v : path.resolve(botRoot, v);
             if (!fs.existsSync(modelPath)) throw new Error(`Piper model not found: ${modelPath}`);
 
             const piperProcess = spawn(piperPath, ['--model', modelPath, '--output_file', '-']);
             
-            piperProcess.stderr.on('data', (data) => {
-                console.error(`[Piper Engine Log] ${data.toString().trim()}`);
-            });
-
+            piperProcess.stderr.on('data', (data) => console.error(`[Piper Engine] ${data.toString().trim()}`));
+            
             piperProcess.stdin.write(sanitizedText + '\n');
             piperProcess.stdin.end();
 
             return piperProcess.stdout;
 
         } else if (provider === 'espeak') {
+            // Use standard hyphen strings explicitly to prevent any em-dash leak
             const espeakPath = resolvePath('espeak-ng');
             const voice = cleanVoiceKey || 'en-us';
             
             return new Promise((resolve, reject) => {
                 console.log(`[eSpeak Debug] Spawning: ${espeakPath} -v ${voice} --stdout`);
-                const espeakProcess = spawn(espeakPath, ['-v', voice, '--stdout']);
+                
+                // Construct args with guaranteed standard hyphens
+                const args = ['-v', voice, '--stdout'];
+                const espeakProcess = spawn(espeakPath, args);
                 
                 let dataCount = 0;
-                espeakProcess.stdout.on('data', (chunk) => {
-                    dataCount += chunk.length;
-                });
-
-                espeakProcess.stderr.on('data', (data) => {
-                    console.error(`[eSpeak Engine Log] ${data.toString().trim()}`);
-                });
+                espeakProcess.stdout.on('data', (chunk) => dataCount += chunk.length);
+                espeakProcess.stderr.on('data', (data) => console.error(`[eSpeak Engine] ${data.toString().trim()}`));
 
                 espeakProcess.on('close', (code) => {
-                    console.log(`[eSpeak Debug] Process closed with code ${code}. Total data: ${dataCount} bytes.`);
+                    console.log(`[eSpeak Debug] Closed with code ${code}. Data: ${dataCount} bytes.`);
                 });
 
-                espeakProcess.on('error', (err) => reject(new Error(`Failed to start espeak-ng: ${err.message}`)));
+                espeakProcess.on('error', (err) => {
+                    console.error(`[eSpeak Spawn Error] ${err.message}`);
+                    reject(err);
+                });
                 
                 espeakProcess.stdin.write(sanitizedText + '\n');
                 espeakProcess.stdin.end();
@@ -126,19 +112,10 @@ async function getAudioStream(text, provider, voiceKey) {
             const voice = cleanVoiceKey || 'alan';
 
             return new Promise((resolve, reject) => {
-                console.log(`[RHVoice Debug] Spawning: ${rhvoicePath} -p ${voice} -o -`);
-                const rhvoiceProcess = spawn(rhvoicePath, ['-p', voice, '-o', '-']);
+                const args = ['-p', voice, '-o', '-'];
+                const rhvoiceProcess = spawn(rhvoicePath, args);
                 
-                let dataCount = 0;
-                rhvoiceProcess.stdout.on('data', (chunk) => {
-                    dataCount += chunk.length;
-                });
-
-                rhvoiceProcess.on('close', (code) => {
-                    console.log(`[RHVoice Debug] Process closed with code ${code}. Total data: ${dataCount} bytes.`);
-                });
-
-                rhvoiceProcess.on('error', (err) => reject(new Error(`Failed to start RHVoice: ${err.message}`)));
+                rhvoiceProcess.on('error', (err) => reject(err));
                 rhvoiceProcess.stdin.write(sanitizedText + '\n');
                 rhvoiceProcess.stdin.end();
                 resolve(rhvoiceProcess.stdout);
@@ -153,16 +130,11 @@ async function getAudioStream(text, provider, voiceKey) {
 
 async function getAudioResource(text, provider, voiceKey) {
     try {
-        console.log(`[TTS Debug] Fetching audio resource for provider: ${provider}`);
         const stream = await getAudioStream(text, provider, voiceKey);
-        
-        const resource = createAudioResource(stream, { 
+        return createAudioResource(stream, { 
             inputType: StreamType.Arbitrary,
             inlineVolume: true 
         });
-        
-        console.log(`[TTS Debug] Audio resource created successfully.`);
-        return resource;
     } catch (error) {
         console.error(`[AudioResource] ${error.message}`);
         throw error;
