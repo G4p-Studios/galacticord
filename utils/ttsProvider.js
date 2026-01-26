@@ -11,36 +11,41 @@ function getEdgeVoices() {
     return [];
 }
 
+/**
+ * Normalizes all variations of dashes/hyphens to a standard ASCII hyphen.
+ * This prevents path and command execution errors on some systems.
+ */
 function normalizeDashes(str) {
     if (typeof str !== 'string') return str;
-    // Replace em-dash (—) and en-dash (–) with standard hyphen (-)
-    return str.replace(/[—–]/g, '-');
+    // Replace all Unicode dash variations (\u2010 to \u2015) with ASCII hyphen (\u002d)
+    return str.replace(/[‐‑‒–—―]/g, '\u002d');
 }
 
+/**
+ * Resolves the absolute path of a command, checking common Linux locations as fallbacks.
+ */
 function resolvePath(command) {
     const cmd = normalizeDashes(command);
     try {
+        // Try 'which' first
         const fullPath = execSync(`which ${cmd}`).toString().trim();
-        console.log(`[Path Debug] Resolved ${cmd} to: ${fullPath}`);
         return fullPath;
     } catch (e) {
-        // Try common linux paths as fallback
-        const commonPaths = [`/usr/bin/${cmd}`, `/usr/local/bin/${cmd}`, `/usr/sbin/${cmd}`];
-        for (const p of commonPaths) {
-            if (fs.existsSync(p)) {
-                console.log(`[Path Debug] Found ${cmd} at common location: ${p}`);
-                return p;
-            }
+        // Search common Linux binary paths
+        const searchPaths = ['/usr/bin', '/usr/local/bin', '/usr/sbin', '/bin'];
+        for (const dir of searchPaths) {
+            const p = path.join(dir, cmd);
+            if (fs.existsSync(p)) return p;
         }
-        console.error(`[Path Debug] Failed to resolve ${cmd}. Falling back to: ${cmd}`);
-        return cmd; 
+        return cmd; // Fallback to raw name if not found
     }
 }
 
 async function getAudioStream(text, provider, voiceKey) {
+    const cleanVoiceKey = normalizeDashes(voiceKey);
+    const sanitizedText = text.replace(/\s+/g, ' ').trim();
+
     try {
-        const cleanVoiceKey = normalizeDashes(voiceKey);
-        
         if (provider === 'google') {
             const voiceOptions = require('./voiceConstants');
             const voiceConfig = voiceOptions[cleanVoiceKey] || voiceOptions['en-US'];
@@ -63,70 +68,50 @@ async function getAudioStream(text, provider, voiceKey) {
                 const response = await axios.get(results[0].url, { responseType: 'stream' });
                 return response.data;
             }
+
         } else if (provider === 'piper') {
-            const piperPath = 'piper';
+            const piperPath = resolvePath('piper');
             const botRoot = path.resolve(__dirname, '..');
             
             let effectiveVoiceKey = (typeof cleanVoiceKey === 'string') ? cleanVoiceKey.trim() : 'models/en_US-amy-medium.onnx';
-            
-            const isModelFile = effectiveVoiceKey.endsWith('.onnx');
-            const hasPath = effectiveVoiceKey.includes('/') || effectiveVoiceKey.includes('\\');
-
-            if (!effectiveVoiceKey || effectiveVoiceKey === 'onnx' || effectiveVoiceKey === 'undefined' || (!isModelFile && !hasPath)) {
+            if (!effectiveVoiceKey.endsWith('.onnx')) {
                 effectiveVoiceKey = 'models/en_US-amy-medium.onnx';
             }
 
             const modelPath = path.isAbsolute(effectiveVoiceKey) ? effectiveVoiceKey : path.resolve(botRoot, effectiveVoiceKey);
-            
-            if (!fs.existsSync(modelPath)) throw new Error(`Piper model not found at: ${modelPath}`);
+            if (!fs.existsSync(modelPath)) throw new Error(`Piper model not found: ${modelPath}`);
 
             const piperProcess = spawn(piperPath, ['--model', modelPath, '--output_file', '-']);
-            const sanitizedText = text.replace(/\s+/g, ' ').trim();
-            
             piperProcess.stdin.write(sanitizedText + '\n');
             piperProcess.stdin.end();
 
             return piperProcess.stdout;
-        } else if (provider === 'espeak') {
-            return new Promise((resolve, reject) => {
-                const espeakPath = resolvePath('espeak-ng');
-                const voice = cleanVoiceKey || 'en-us';
-                const sanitizedText = text.replace(/\s+/g, ' ').trim();
-                
-                console.log(`[eSpeak Debug] Spawning absolute path: ${espeakPath} -v ${voice}`);
-                const espeakProcess = spawn(espeakPath, ['-v', voice, '--stdout', sanitizedText]);
-                
-                espeakProcess.on('error', (err) => {
-                    console.error(`[eSpeak TTS Error] Failed to start espeak-ng at ${espeakPath}: ${err.message}`);
-                    reject(new Error("Failed to start eSpeak-ng. Is it installed and executable?"));
-                });
 
+        } else if (provider === 'espeak') {
+            const espeakPath = resolvePath('espeak-ng');
+            const voice = cleanVoiceKey || 'en-us';
+            
+            return new Promise((resolve, reject) => {
+                const espeakProcess = spawn(espeakPath, ['-v', voice, '--stdout', sanitizedText]);
+                espeakProcess.on('error', (err) => reject(new Error(`Failed to start espeak-ng: ${err.message}`)));
                 resolve(espeakProcess.stdout);
             });
 
         } else if (provider === 'rhvoice') {
+            const rhvoicePath = resolvePath('RHVoice-test');
+            const voice = cleanVoiceKey || 'alan';
+
             return new Promise((resolve, reject) => {
-                const rhvoicePath = resolvePath('RHVoice-test');
-                const voice = cleanVoiceKey || 'alan';
-                const sanitizedText = text.replace(/\s+/g, ' ').trim();
-
-                console.log(`[RHVoice Debug] Spawning absolute path: ${rhvoicePath} -p ${voice}`);
                 const rhvoiceProcess = spawn(rhvoicePath, ['-p', voice, '-o', '-']);
-                
-                rhvoiceProcess.on('error', (err) => {
-                    console.error(`[RHVoice TTS Error] Failed to start RHVoice at ${rhvoicePath}: ${err.message}`);
-                    reject(new Error("Failed to start RHVoice. Is it installed and executable?"));
-                });
-
+                rhvoiceProcess.on('error', (err) => reject(new Error(`Failed to start RHVoice: ${err.message}`)));
                 rhvoiceProcess.stdin.write(sanitizedText + '\n');
                 rhvoiceProcess.stdin.end();
-
                 resolve(rhvoiceProcess.stdout);
             });
         }
         throw new Error("Unknown provider");
     } catch (error) {
-        console.error(`[TTS Provider Error] ${error.message}`);
+        console.error(`[TTS Provider] ${error.message}`);
         throw error;
     }
 }
@@ -136,7 +121,7 @@ async function getAudioResource(text, provider, voiceKey) {
         const stream = await getAudioStream(text, provider, voiceKey);
         return createAudioResource(stream, { inputType: StreamType.Arbitrary });
     } catch (error) {
-        console.error(`[AudioResource Error] ${error.message}`);
+        console.error(`[AudioResource] ${error.message}`);
         throw error;
     }
 }
