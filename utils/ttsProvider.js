@@ -118,8 +118,16 @@ async function getAudioStream(text, provider, voiceKey) {
 
 async function getAudioResource(text, provider, voiceKey) {
     try {
+        console.log(`[TTS Debug] Fetching audio resource for provider: ${provider}`);
         const stream = await getAudioStream(text, provider, voiceKey);
-        return createAudioResource(stream, { inputType: StreamType.Arbitrary });
+        
+        const resource = createAudioResource(stream, { 
+            inputType: StreamType.Arbitrary,
+            inlineVolume: true 
+        });
+        
+        console.log(`[TTS Debug] Audio resource created successfully.`);
+        return resource;
     } catch (error) {
         console.error(`[AudioResource] ${error.message}`);
         throw error;

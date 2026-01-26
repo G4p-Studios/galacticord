@@ -19,8 +19,19 @@ function addToQueue(guildId, resource, connection) {
             }
         });
 
+        player.on(AudioPlayerStatus.Playing, () => {
+            console.log(`[AudioQueue] Player is now PLAYING for Guild ${guildId}`);
+        });
+
+        player.on('stateChange', (oldState, newState) => {
+            console.log(`[AudioQueue Debug] State change: ${oldState.status} -> ${newState.status}`);
+        });
+
         player.on('error', error => {
-            console.error(`[Player Error Guild ${guildId}] Details:`, error.message);
+            console.error(`[AudioQueue Error] Player error for Guild ${guildId}:`, error.message);
+            if (error.resource) {
+                console.error(`[AudioQueue Error] Resource was specifically mentioned in error.`);
+            }
         });
     }
 
@@ -28,11 +39,11 @@ function addToQueue(guildId, resource, connection) {
     connection.subscribe(guildData.player);
 
     if (guildData.player.state.status === AudioPlayerStatus.Idle) {
+        console.log(`[AudioQueue] Starting immediate playback for Guild ${guildId}`);
         guildData.player.play(resource);
-        console.log(`[AudioQueue] Playing immediately for Guild ${guildId}`);
     } else {
         guildData.queue.push(resource);
-        console.log(`[AudioQueue] Added to queue for Guild ${guildId}. Queue length: ${guildData.queue.length}`);
+        console.log(`[AudioQueue] Added to queue for Guild ${guildId}. Current queue size: ${guildData.queue.length}`);
     }
 }
 
