@@ -54,15 +54,19 @@ VOICES=(
     "en_US-joe-medium"
 )
 
+# Retro Speech Synthesizer Voices
+# Source: https://huggingface.co/eurpod/retro-speech-synthesizers/
+RETRO_VOICES=(
+    "retro-vocal-tract"
+    "retro-klatt"
+    "retro-speakjet"
+    "retro-sam"
+    "retro-dec-talk"
+)
+
 for voice in "${VOICES[@]}"; do
     if [ ! -f "models/${voice}.onnx" ]; then
         echo "Downloading ${voice}..."
-        # Extract the base name (e.g., amy) and quality (e.g., medium) for the URL
-        # URL structure: https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx
-        
-        # This is a bit complex to automate for ALL voices because of the folder structure, 
-        # so we will use the direct links for the most popular US voices:
-        
         case $voice in
             "en_US-amy-medium") URL_BASE="en/en_US/amy/medium" ;;
             "en_US-kathleen-low") URL_BASE="en/en_US/kathleen/low" ;;
@@ -71,11 +75,21 @@ for voice in "${VOICES[@]}"; do
             "en_US-ryan-medium") URL_BASE="en/en_US/ryan/medium" ;;
             "en_US-joe-medium") URL_BASE="en/en_US/joe/medium" ;;
         esac
-
         wget -q --show-progress -O "models/${voice}.onnx" "https://huggingface.co/rhasspy/piper-voices/resolve/main/${URL_BASE}/${voice}.onnx?download=true"
         wget -q --show-progress -O "models/${voice}.onnx.json" "https://huggingface.co/rhasspy/piper-voices/resolve/main/${URL_BASE}/${voice}.onnx.json?download=true"
     else
         echo "Voice ${voice} already exists."
+    fi
+done
+
+echo "[3.5/4] Downloading Retro Voices..."
+for voice in "${RETRO_VOICES[@]}"; do
+    if [ ! -f "models/${voice}.onnx" ]; then
+        echo "Downloading Retro ${voice}..."
+        wget -q --show-progress -O "models/${voice}.onnx" "https://huggingface.co/eurpod/retro-speech-synthesizers/resolve/main/${voice}.onnx?download=true"
+        wget -q --show-progress -O "models/${voice}.onnx.json" "https://huggingface.co/eurpod/retro-speech-synthesizers/resolve/main/${voice}.onnx.json?download=true"
+    else
+        echo "Retro voice ${voice} already exists."
     fi
 done
 
