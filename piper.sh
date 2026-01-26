@@ -87,9 +87,14 @@ done
 
 # Process Retro Voices
 for voice in "${RETRO_VOICES[@]}"; do
-    download_voice "$voice" \
-        "https://huggingface.co/eurpod/retro-speech-synthesizers/resolve/main/${voice}.onnx?download=true" \
-        "https://huggingface.co/eurpod/retro-speech-synthesizers/resolve/main/${voice}.onnx.json?download=true"
+    case $voice in
+        "retro-sam") U="https://huggingface.co/eurpod/retro-speech-synthesizers/resolve/main/retro-sam" ;;
+        "retro-dec-talk") U="https://huggingface.co/eurpod/retro-speech-synthesizers/resolve/main/retro-dec-talk" ;;
+        "retro-speakjet") U="https://huggingface.co/eurpod/retro-speech-synthesizers/resolve/main/retro-speakjet" ;;
+        "retro-klatt") U="https://huggingface.co/eurpod/retro-speech-synthesizers/resolve/main/retro-klatt" ;;
+        "retro-vocal-tract") U="https://huggingface.co/eurpod/retro-speech-synthesizers/resolve/main/retro-vocal-tract" ;;
+    esac
+    download_voice "$voice" "${U}.onnx?download=true" "${U}.onnx.json?download=true"
 done
 
 echo "---------------------------------------------------"
