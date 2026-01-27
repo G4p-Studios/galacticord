@@ -129,7 +129,7 @@ module.exports = {
                     return { name: prettyName, value: path.join('models', f) };
                 });
             }
-            if (focusedValue.includes('/') || focusedValue.includes('\')) {
+            if (focusedValue.includes('/') || focusedValue.includes('\\')) {
                 choices.push({ name: `Custom Path: ${focusedValue}`, value: focusedValue });
             }
         } else if (mode === 'espeak') {
