@@ -183,12 +183,9 @@ module.exports = {
 
             // SPECIAL HANDLING FOR STAR
             if (mode === 'star') {
-                const starUrl = userSetting?.starUrl || serverSetting?.starUrl;
-                if (!starUrl) {
-                    console.log(`[MessageCreate] STAR mode selected but no URL found.`);
-                    // Fallback to piper to avoid silence/crash if URL is missing
-                    // mode = 'piper'; // Can't easily switch mode var here, so we just log warning.
-                }
+                const defaultStarUrl = 'https://speech.seedy.cc';
+                const starUrl = userSetting?.starUrl || serverSetting?.starUrl || defaultStarUrl;
+                
                 // Pack URL and Voice into the key for ttsProvider to unpack
                 voiceKey = JSON.stringify({
                     url: starUrl,

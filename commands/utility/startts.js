@@ -32,12 +32,9 @@ module.exports = {
         const userSetting = settings.users[interaction.user.id] || {};
         const serverSetting = settings.servers[interaction.guild.id] || {};
 
-        const starUrl = userSetting.starUrl || serverSetting.starUrl;
+        const defaultStarUrl = 'https://speech.seedy.cc';
+        const starUrl = userSetting.starUrl || serverSetting.starUrl || defaultStarUrl;
         const voiceKey = userSetting.voice || serverSetting.voice || 'default';
-
-        if (!starUrl) {
-            return interaction.editReply('❌ You have not configured a STAR URL. Use `/set star_url` first.');
-        }
 
         try {
             // Bundle STAR config into voiceKey JSON string as expected by ttsProvider

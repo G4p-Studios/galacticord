@@ -167,15 +167,12 @@ module.exports = {
                 { name: 'Irina (Russian)', value: 'irina' }
             ];
         } else if (mode === 'star') {
-            const userUrl = settings.users[interaction.user.id]?.starUrl || settings.servers[interaction.guild.id]?.starUrl;
+            const userUrl = settings.users[interaction.user.id]?.starUrl || settings.servers[interaction.guild.id]?.starUrl || 'https://speech.seedy.cc';
             
-            if (!userUrl) {
-                choices = [{ name: '⚠️ Set URL first (/set star_url)', value: 'error' }];
-            } else {
-                try {
-                    // Fetch voices via WebSocket
-                    const WebSocket = require('ws');
-                    const wsUrl = userUrl.replace(/^http/, 'ws');
+            try {
+                // Fetch voices via WebSocket
+                const WebSocket = require('ws');
+                const wsUrl = userUrl.replace(/^http/, 'ws');
                     
                     const fetchVoices = () => new Promise((resolve, reject) => {
                         const ws = new WebSocket(wsUrl);

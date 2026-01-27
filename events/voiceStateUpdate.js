@@ -75,7 +75,8 @@ module.exports = {
             let voiceKey = serverSetting?.voice || defaultVoice;
 
             if (mode === 'star') {
-                const starUrl = serverSetting?.starUrl;
+                const defaultStarUrl = 'https://speech.seedy.cc';
+                const starUrl = serverSetting?.starUrl || defaultStarUrl;
                 voiceKey = JSON.stringify({
                     url: starUrl,
                     voice: voiceKey

@@ -73,7 +73,7 @@ module.exports = {
                 }
             } catch (e) {}
 
-            const userUrl = settings.users[interaction.user.id]?.starUrl || settings.servers[interaction.guild.id]?.starUrl;
+            const userUrl = settings.users[interaction.user.id]?.starUrl || settings.servers[interaction.guild.id]?.starUrl || 'https://speech.seedy.cc';
             if (userUrl) {
                 try {
                     const WebSocket = require('ws');
@@ -117,8 +117,7 @@ module.exports = {
                     settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
                 }
             } catch (e) {}
-            const starUrl = settings.users[interaction.user.id]?.starUrl || settings.servers[interaction.guild.id]?.starUrl;
-            if (!starUrl) return interaction.editReply('❌ No STAR URL configured. Use `/set star_url` first.');
+            const starUrl = settings.users[interaction.user.id]?.starUrl || settings.servers[interaction.guild.id]?.starUrl || 'https://speech.seedy.cc';
             finalVoice = JSON.stringify({ url: starUrl, voice: voice });
         }
 
