@@ -99,7 +99,6 @@ module.exports = {
         const focusedValue = interaction.options.getFocused();
         const target = interaction.options.getString('target');
         
-        // Determine current mode for target to show relevant voices
         let settings = { users: {}, servers: {} };
         try {
             if (fs.existsSync(ttsSettingsFile)) {
@@ -107,18 +106,12 @@ module.exports = {
             }
         } catch (e) {}
 
-        // Default to Piper if not set
         let mode = 'piper';
         if (target === 'user') {
             mode = settings.users[interaction.user.id]?.mode || settings.servers[interaction.guild.id]?.mode || 'piper';
         } else {
             mode = settings.servers[interaction.guild.id]?.mode || 'piper';
         }
-
-        // Wait... user might be changing mode separately.
-        // But for selecting a voice, we should probably show voices for the CURRENTLY selected mode
-        // OR we could show all but that's messy. 
-        // Better: Check the mode setting in the file.
 
         let choices = [];
         if (mode === 'google') {
@@ -131,18 +124,12 @@ module.exports = {
             if (fs.existsSync(modelsDir)) {
                 const files = fs.readdirSync(modelsDir).filter(f => f.endsWith('.onnx'));
                 choices = files.map(f => {
-                    // Prettify name: en_US-amy-medium.onnx -> Amy (Medium)
                     let prettyName = f.replace('.onnx', '').replace('en_US-', '').replace('en_GB-', '');
                     prettyName = prettyName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-                    
-                    return {
-                        name: prettyName,
-                        value: path.join('models', f)
-                    };
+                    return { name: prettyName, value: path.join('models', f) };
                 });
             }
-            // Always allow manual path entry if nothing found or to complement
-            if (focusedValue.includes('/') || focusedValue.includes('\\')) {
+            if (focusedValue.includes('/') || focusedValue.includes('\')) {
                 choices.push({ name: `Custom Path: ${focusedValue}`, value: focusedValue });
             }
         } else if (mode === 'espeak') {
@@ -168,211 +155,136 @@ module.exports = {
             ];
         } else if (mode === 'star') {
             const userUrl = settings.users[interaction.user.id]?.starUrl || settings.servers[interaction.guild.id]?.starUrl || 'https://speech.seedy.cc';
-            
             try {
-                // Fetch voices via WebSocket
                 const WebSocket = require('ws');
                 const wsUrl = userUrl.replace(/^http/, 'ws');
-                    
-                    const fetchVoices = () => new Promise((resolve, reject) => {
-                        const ws = new WebSocket(wsUrl);
-                        const timeout = setTimeout(() => { ws.terminate(); resolve([]); }, 2000); // 2s timeout for UI responsiveness
-
-                        ws.on('open', () => {
-                            ws.send(JSON.stringify({ user: 4 })); // Request voice list with revision 4
-                        });
-
-                        ws.on('message', (data) => {
-                            try {
-                                const response = JSON.parse(data.toString());
-                                if (response.voices && Array.isArray(response.voices)) {
-                                    resolve(response.voices);
-                                    ws.close();
-                                }
-                            } catch (e) {}
-                        });
-
-                        ws.on('error', () => { resolve([]); });
+                const fetchVoices = () => new Promise((resolve) => {
+                    const ws = new WebSocket(wsUrl);
+                    const timeout = setTimeout(() => { ws.terminate(); resolve([]); }, 2000);
+                    ws.on('open', () => ws.send(JSON.stringify({ user: 4 })));
+                    ws.on('message', (data) => {
+                        try {
+                            const response = JSON.parse(data.toString());
+                            if (response.voices && Array.isArray(response.voices)) {
+                                resolve(response.voices);
+                                ws.close();
+                            }
+                        } catch (e) {}
                     });
-
-                    const voiceList = await fetchVoices();
-                    
-                    if (voiceList.length > 0) {
-                        choices = voiceList.map(v => ({ name: v, value: v }));
-                    } else {
-                        choices = [{ name: 'No voices found or connection failed', value: 'error_empty' }];
-                    }
-
-                } catch (e) {
-                    choices = [{ name: '❌ Error connecting to server', value: 'error_conn' }];
+                    ws.on('error', () => resolve([]));
+                });
+                const voiceList = await fetchVoices();
+                if (voiceList.length > 0) {
+                    choices = voiceList.map(v => ({ name: v, value: v }));
+                } else {
+                    choices = [{ name: 'No voices found or connection failed', value: 'error_empty' }];
                 }
+            } catch (e) {
+                choices = [{ name: '❌ Error connecting to server', value: 'error_conn' }];
             }
         }
 
         const filtered = choices.filter(choice => choice.name.toLowerCase().includes(focusedValue.toLowerCase()));
-        
-        // Max 25 choices
-        await interaction.respond(
-            filtered.slice(0, 25)
-        );
+        await interaction.respond(filtered.slice(0, 25));
     },
     async execute(interaction) {
         const subcommand = interaction.options.getSubcommand();
         const serverConfigFile = path.join(__dirname, '../../data/server_config.json');
 
         if (subcommand === 'channel') {
-            // --- Channel Logic ---
             if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
                 return interaction.reply({ content: 'You need Manage Guild permissions to use this command.', ephemeral: true });
             }
-
             const type = interaction.options.getString('type');
             const channel = interaction.options.getChannel('channel');
-
             let config = {};
-            try {
-                if (fs.existsSync(serverConfigFile)) {
-                    config = JSON.parse(fs.readFileSync(serverConfigFile, 'utf8'));
-                }
-            } catch (e) {}
-
+            try { if (fs.existsSync(serverConfigFile)) config = JSON.parse(fs.readFileSync(serverConfigFile, 'utf8')); } catch (e) {}
             if (!config[interaction.guild.id]) config[interaction.guild.id] = {};
             config[interaction.guild.id][type] = channel.id;
-
             fs.writeFileSync(serverConfigFile, JSON.stringify(config, null, 2));
-
             const typeName = type === 'logChannel' ? 'Log Channel' : 'TTS Channel';
             await interaction.reply({ content: `✅ **${typeName}** has been set to ${channel}.` });
 
         } else if (subcommand === 'bot') {
-            // --- Bot Toggle Logic ---
             if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
                 return interaction.reply({ content: 'You need Manage Guild permissions to use this command.', ephemeral: true });
             }
-            
             const speak = interaction.options.getBoolean('speak');
-
             let config = {};
-            try {
-                if (fs.existsSync(serverConfigFile)) {
-                    config = JSON.parse(fs.readFileSync(serverConfigFile, 'utf8'));
-                }
-            } catch (e) {}
-
+            try { if (fs.existsSync(serverConfigFile)) config = JSON.parse(fs.readFileSync(serverConfigFile, 'utf8')); } catch (e) {}
             if (!config[interaction.guild.id]) config[interaction.guild.id] = {};
-            config[interaction.guild.id].ignoreBots = !speak; // If speak is true, ignoreBots is false
-
+            config[interaction.guild.id].ignoreBots = !speak;
             fs.writeFileSync(serverConfigFile, JSON.stringify(config, null, 2));
-
             await interaction.reply({ content: `✅ Bot messages will now be **${speak ? 'SPOKEN' : 'IGNORED'}**.` });
 
         } else if (subcommand === 'star_url') {
-            // --- STAR URL Logic ---
             const target = interaction.options.getString('target');
             const url = interaction.options.getString('url');
-            
             if (target === 'server' && !interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
                 return interaction.reply({ content: 'You need Manage Guild permissions to set the Server STAR URL.', ephemeral: true });
             }
-
-            // Basic validation
-            if (!url.startsWith('http')) {
-                return interaction.reply({ content: '❌ Invalid URL. Please include http:// or https://', ephemeral: true });
-            }
-
+            if (!url.startsWith('http')) return interaction.reply({ content: '❌ Invalid URL. Please include http:// or https://', ephemeral: true });
             let settings = { users: {}, servers: {} };
-            try {
-                if (fs.existsSync(ttsSettingsFile)) {
-                    settings = JSON.parse(fs.readFileSync(ttsSettingsFile, 'utf8'));
-                }
-            } catch (e) {}
-
+            try { if (fs.existsSync(ttsSettingsFile)) settings = JSON.parse(fs.readFileSync(ttsSettingsFile, 'utf8')); } catch (e) {}
             if (target === 'user') {
                 if (!settings.users[interaction.user.id]) settings.users[interaction.user.id] = {};
                 settings.users[interaction.user.id].starUrl = url;
                 settings.users[interaction.user.id].mode = 'star';
-                await interaction.reply({ content: `✅ Your **STAR URL** has been set to: \`${url}\`\n✅ Provider switched to **STAR**.` });
+                await interaction.reply({ content: `✅ Your **STAR URL** has been set to: 
+${url}
+✅ Provider switched to **STAR**.` });
             } else {
                 if (!settings.servers[interaction.guild.id]) settings.servers[interaction.guild.id] = {};
                 settings.servers[interaction.guild.id].starUrl = url;
                 settings.servers[interaction.guild.id].mode = 'star';
-                await interaction.reply({ content: `✅ **Server Default STAR URL** has been set to: \`${url}\`\n✅ Server Default Provider switched to **STAR**.` });
+                await interaction.reply({ content: `✅ **Server Default STAR URL** has been set to: 
+${url}
+✅ Server Default Provider switched to **STAR**.` });
             }
-
             fs.writeFileSync(ttsSettingsFile, JSON.stringify(settings, null, 2));
 
         } else if (subcommand === 'mode') {
-            // --- Mode Logic ---
             const target = interaction.options.getString('target');
             const provider = interaction.options.getString('provider');
-
             if (target === 'server' && !interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
                 return interaction.reply({ content: 'You need Manage Guild permissions to set Server Default.', ephemeral: true });
             }
-
             let settings = { users: {}, servers: {} };
-            try {
-                if (fs.existsSync(ttsSettingsFile)) {
-                    settings = JSON.parse(fs.readFileSync(ttsSettingsFile, 'utf8'));
-                }
-            } catch (e) {}
-
+            try { if (fs.existsSync(ttsSettingsFile)) settings = JSON.parse(fs.readFileSync(ttsSettingsFile, 'utf8')); } catch (e) {}
             if (target === 'user') {
                 if (!settings.users[interaction.user.id]) settings.users[interaction.user.id] = {};
-                // If it was string (old format), convert to object
-                if (typeof settings.users[interaction.user.id] === 'string') {
-                    settings.users[interaction.user.id] = { voice: settings.users[interaction.user.id] };
-                }
+                if (typeof settings.users[interaction.user.id] === 'string') settings.users[interaction.user.id] = { voice: settings.users[interaction.user.id] };
                 settings.users[interaction.user.id].mode = provider;
                 const providerMap = { 'google': 'Google Translate', 'piper': 'Piper', 'espeak': 'eSpeak-ng', 'rhvoice': 'RHVoice', 'star': 'STAR (Distributed)' };
-                const providerName = providerMap[provider] || provider;
-                await interaction.reply({ content: `✅ Your TTS Provider is now: **${providerName}**` });
+                await interaction.reply({ content: `✅ Your TTS Provider is now: **${providerMap[provider] || provider}**` });
             } else {
                 if (!settings.servers[interaction.guild.id]) settings.servers[interaction.guild.id] = {};
-                if (typeof settings.servers[interaction.guild.id] === 'string') {
-                    settings.servers[interaction.guild.id] = { voice: settings.servers[interaction.guild.id] };
-                }
+                if (typeof settings.servers[interaction.guild.id] === 'string') settings.servers[interaction.guild.id] = { voice: settings.servers[interaction.guild.id] };
                 settings.servers[interaction.guild.id].mode = provider;
                 const providerMap = { 'google': 'Google Translate', 'piper': 'Piper', 'espeak': 'eSpeak-ng', 'rhvoice': 'RHVoice', 'star': 'STAR (Distributed)' };
-                const providerName = providerMap[provider] || provider;
-                await interaction.reply({ content: `✅ Server Default TTS Provider is now: **${providerName}**` });
+                await interaction.reply({ content: `✅ Server Default TTS Provider is now: **${providerMap[provider] || provider}**` });
             }
-
             fs.writeFileSync(ttsSettingsFile, JSON.stringify(settings, null, 2));
 
         } else if (subcommand === 'voice') {
-            // --- Voice Logic ---
             const target = interaction.options.getString('target');
             const selectedVoiceKey = interaction.options.getString('voice');
-
             if (target === 'server' && !interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
                 return interaction.reply({ content: 'You need Manage Guild permissions to set the Server Default voice.', ephemeral: true });
             }
-
             let settings = { users: {}, servers: {} };
-            try {
-                if (fs.existsSync(ttsSettingsFile)) {
-                    settings = JSON.parse(fs.readFileSync(ttsSettingsFile, 'utf8'));
-                }
-            } catch (e) {}
-
+            try { if (fs.existsSync(ttsSettingsFile)) settings = JSON.parse(fs.readFileSync(ttsSettingsFile, 'utf8')); } catch (e) {}
             if (target === 'user') {
                 if (!settings.users[interaction.user.id]) settings.users[interaction.user.id] = {};
-                if (typeof settings.users[interaction.user.id] === 'string') {
-                    settings.users[interaction.user.id] = { voice: settings.users[interaction.user.id] };
-                }
+                if (typeof settings.users[interaction.user.id] === 'string') settings.users[interaction.user.id] = { voice: settings.users[interaction.user.id] };
                 settings.users[interaction.user.id].voice = selectedVoiceKey;
-                
                 await interaction.reply({ content: `✅ Your personal TTS voice has been set.` });
             } else {
                 if (!settings.servers[interaction.guild.id]) settings.servers[interaction.guild.id] = {};
-                if (typeof settings.servers[interaction.guild.id] === 'string') {
-                    settings.servers[interaction.guild.id] = { voice: settings.servers[interaction.guild.id] };
-                }
+                if (typeof settings.servers[interaction.guild.id] === 'string') settings.servers[interaction.guild.id] = { voice: settings.servers[interaction.guild.id] };
                 settings.servers[interaction.guild.id].voice = selectedVoiceKey;
                 await interaction.reply({ content: `✅ Server default TTS voice has been set.` });
             }
-
             fs.writeFileSync(ttsSettingsFile, JSON.stringify(settings, null, 2));
         }
     },
