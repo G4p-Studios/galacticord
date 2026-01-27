@@ -159,29 +159,47 @@ module.exports = {
                 { name: 'Irina (Russian)', value: 'irina' }
             ];
         } else if (mode === 'star') {
-            // Fetch from user's configured URL
             const userUrl = settings.users[interaction.user.id]?.starUrl || settings.servers[interaction.guild.id]?.starUrl;
             
             if (!userUrl) {
                 choices = [{ name: '⚠️ Set URL first (/set star_url)', value: 'error' }];
             } else {
                 try {
-                    // Assume STAR API has a /voices endpoint
-                    const axios = require('axios');
-                    const response = await axios.get(`${userUrl}/voices`, { timeout: 2000 });
+                    // Fetch voices via WebSocket
+                    const WebSocket = require('ws');
+                    const wsUrl = userUrl.replace(/^http/, 'ws');
                     
-                    if (Array.isArray(response.data)) {
-                        // Adapt based on actual STAR API structure (assuming list of strings or objects)
-                        choices = response.data.map(v => {
-                            const vName = typeof v === 'string' ? v : (v.name || v.id);
-                            const vId = typeof v === 'string' ? v : (v.id || v.name);
-                            return { name: vName, value: vId };
+                    const fetchVoices = () => new Promise((resolve, reject) => {
+                        const ws = new WebSocket(wsUrl);
+                        const timeout = setTimeout(() => { ws.terminate(); resolve([]); }, 2000); // 2s timeout for UI responsiveness
+
+                        ws.on('open', () => {
+                            ws.send(JSON.stringify({ user: 0 })); // Request voice list
                         });
-                    } else if (typeof response.data === 'object') {
-                         choices = Object.keys(response.data).map(k => ({ name: k, value: k }));
+
+                        ws.on('message', (data) => {
+                            try {
+                                const response = JSON.parse(data.toString());
+                                if (response.voices && Array.isArray(response.voices)) {
+                                    resolve(response.voices);
+                                    ws.close();
+                                }
+                            } catch (e) {}
+                        });
+
+                        ws.on('error', () => { resolve([]); });
+                    });
+
+                    const voiceList = await fetchVoices();
+                    
+                    if (voiceList.length > 0) {
+                        choices = voiceList.map(v => ({ name: v, value: v }));
+                    } else {
+                        choices = [{ name: 'No voices found or connection failed', value: 'error_empty' }];
                     }
+
                 } catch (e) {
-                    choices = [{ name: `❌ Error connecting to ${userUrl}`, value: 'error_conn' }];
+                    choices = [{ name: '❌ Error connecting to server', value: 'error_conn' }];
                 }
             }
         }
