@@ -15,7 +15,7 @@ function getEdgeVoices() { return []; }
  */
 function ultimateClean(str) {
     if (typeof str !== 'string') return str;
-    return str.replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212\u2043]/g, '-').trim();
+    return str.replace(/[‐‑‒–—―−⁃]/g, '-').trim();
 }
 
 function resolvePath(command) {
@@ -114,4 +114,68 @@ async function getAudioStream(text, provider, voiceKey) {
             const voice = cleanVoiceKey || 'en-us';
             
             // USE EXEC for maximum compatibility on restrictive systems
-            const safeText = sanitizedText.replace(/
+            const safeText = sanitizedText.replace(/"/g, '\"');
+            const command = `printf "${safeText}" | "${espeakPath}" -v ${voice} --stdout`;
+            
+            console.log(`[eSpeak] Executing: ${command}`);
+
+            return new Promise((resolve, reject) => {
+                const child = exec(command, { encoding: 'buffer', maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+                    if (error) {
+                        console.error(`[eSpeak Error] ${error.message}`);
+                        return reject(error);
+                    }
+                    if (stderr && stderr.length > 0) {
+                        console.error(`[eSpeak Stderr] ${stderr.toString()}`);
+                    }
+                    resolve(Readable.from(stdout));
+                });
+            });
+
+        } else if (cleanProvider === 'rhvoice') {
+            const rhvoicePath = resolvePath('RHVoice-test');
+            const voice = cleanVoiceKey || 'alan';
+            
+            const safeText = sanitizedText.replace(/"/g, '\"');
+            const command = `printf "${safeText}" | "${rhvoicePath}" -p ${voice} -o -`;
+
+            return new Promise((resolve, reject) => {
+                const child = exec(command, { encoding: 'buffer', maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+                    if (error) {
+                        console.error(`[RHVoice Error] ${error.message}`);
+                        return reject(error);
+                    }
+                    resolve(Readable.from(stdout));
+                });
+            });
+
+        } else if (cleanProvider === 'star') {
+            let config = {};
+            try {
+                config = JSON.parse(voiceKey);
+            } catch (e) {
+                throw new Error("STAR configuration invalid. Please set URL with /set star_url");
+            }
+            
+            if (!config.url) throw new Error("No STAR URL configured.");
+            return await getStarAudioStream(sanitizedText, config.url, config.voice || 'default');
+        }
+
+        throw new Error("Unknown provider");
+    } catch (error) {
+        console.error(`[TTS Provider] ${error.message}`);
+        throw error;
+    }
+}
+
+async function getAudioResource(text, provider, voiceKey) {
+    try {
+        const stream = await getAudioStream(text, provider, voiceKey);
+        return createAudioResource(stream, { inputType: StreamType.Arbitrary, inlineVolume: true });
+    } catch (error) {
+        console.error(`[AudioResource] ${error.message}`);
+        throw error;
+    }
+}
+
+module.exports = { init, getEdgeVoices, getAudioResource, getAudioStream };
