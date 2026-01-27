@@ -55,9 +55,11 @@ async function getStarAudioStream(text, url, voice) {
             if (isBinary) {
                 clearTimeout(timeout);
                 try {
+                    // Protocol: 2 byte little-endian length + metadata/ID + audio
                     const idLen = data.readUInt16LE(0);
                     const audioData = data.subarray(2 + idLen);
-                    console.log(`[STAR Debug] Received audio (${audioData.length} bytes)`);
+                    
+                    console.log(`[STAR Debug] Received audio binary: ${audioData.length} bytes`);
                     resolve(Readable.from(audioData));
                     ws.close();
                 } catch (e) {
@@ -65,7 +67,14 @@ async function getStarAudioStream(text, url, voice) {
                     ws.close();
                 }
             } else {
-                console.log(`[STAR Debug] Received text message: ${data.toString()}`);
+                const textMsg = data.toString();
+                console.log(`[STAR Debug] Server sent text: "${textMsg}"`);
+                // Check if the text message looks like an error
+                if (textMsg.toLowerCase().includes('error') || textMsg.toLowerCase().includes('not found')) {
+                    clearTimeout(timeout);
+                    reject(new Error(`STAR Server Error: ${textMsg}`));
+                    ws.close();
+                }
             }
         });
 
@@ -158,7 +167,15 @@ async function getAudioStream(text, provider, voiceKey) {
             }
             
             if (!config.url) throw new Error("No STAR URL configured.");
-            return await getStarAudioStream(sanitizedText, config.url, config.voice || 'default');
+
+            // Fallback for 'onnx' bug or empty voice
+            let effectiveVoice = config.voice;
+            if (!effectiveVoice || effectiveVoice === 'onnx' || effectiveVoice === 'undefined') {
+                effectiveVoice = 'default';
+                console.log(`[STAR Debug] Invalid voice detected. Falling back to 'default'.`);
+            }
+
+            return await getStarAudioStream(sanitizedText, config.url, effectiveVoice);
         }
 
         throw new Error("Unknown provider");
