@@ -3,6 +3,13 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
+// Ensure data directory exists
+const dataDir = path.join(__dirname, 'data');
+if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir);
+    console.log('[System] Created missing data directory.');
+}
+
 console.log(`[System] Starting bot with discord.js v${version}`);
 
 // Add ffmpeg to PATH
