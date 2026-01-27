@@ -44,8 +44,9 @@ async function getStarAudioStream(text, url, voice) {
 
         ws.on('open', () => {
             console.log(`[STAR Debug] Connected to ${wsUrl}. Requesting voice: ${voice}`);
+            // STAR Protocol: {"user": 4, "request": ["Voice: Text"]}
             const payload = {
-                user: 0,
+                user: 4, // Updated to revision 4 as required by server
                 request: [`${voice}: ${text}`]
             };
             ws.send(JSON.stringify(payload));

@@ -174,7 +174,7 @@ module.exports = {
                         const timeout = setTimeout(() => { ws.terminate(); resolve([]); }, 2000); // 2s timeout for UI responsiveness
 
                         ws.on('open', () => {
-                            ws.send(JSON.stringify({ user: 0 })); // Request voice list
+                            ws.send(JSON.stringify({ user: 4 })); // Request voice list with revision 4
                         });
 
                         ws.on('message', (data) => {
