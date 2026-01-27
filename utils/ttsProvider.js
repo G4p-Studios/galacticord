@@ -1,6 +1,6 @@
 const googleTTS = require('google-tts-api');
 const { createAudioResource, StreamType } = require('@discordjs/voice');
-const { spawn, execSync } = require('child_process');
+const { spawn, exec, execSync } = require('child_process');
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
@@ -74,24 +74,24 @@ async function getAudioStream(text, provider, voiceKey) {
             const espeakPath = resolvePath('espeak-ng');
             const voice = cleanVoiceKey || 'en-us';
             
-            console.log(`[eSpeak] Spawning: "${espeakPath}" with voice: "${voice}"`);
+            // Switch to exec to bypass spawn EACCES/permission weirdness
+            // We use printf to pipe the text safely into espeak's stdin
+            const safeText = sanitizedText.replace(/"/g, '\\"');
+            const command = `printf "${safeText}" | "${espeakPath}" -v ${voice} --stdout`;
             
+            console.log(`[eSpeak] Executing: ${command}`);
+
             return new Promise((resolve, reject) => {
-                const espeakProcess = spawn(espeakPath, ['-v', voice, '--stdout']);
-                
-                espeakProcess.on('error', (err) => {
-                    console.error(`[eSpeak Error] ${err.message}`);
-                    reject(err);
+                const child = exec(command, { encoding: 'buffer', maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+                    if (error) {
+                        console.error(`[eSpeak Error] ${error.message}`);
+                        return reject(error);
+                    }
+                    if (stderr && stderr.length > 0) {
+                        console.error(`[eSpeak Stderr] ${stderr.toString()}`);
+                    }
+                    resolve(StreamType.Arbitrary ? require('stream').Readable.from(stdout) : stdout);
                 });
-
-                // Safety: Check if stdin exists before writing to prevent EPIPE crash
-                if (espeakProcess.stdin) {
-                    espeakProcess.stdin.on('error', (err) => console.error('[eSpeak Stdin Error]', err.message));
-                    espeakProcess.stdin.write(sanitizedText + '\n');
-                    espeakProcess.stdin.end();
-                }
-
-                resolve(espeakProcess.stdout);
             });
 
         } else if (cleanProvider === 'rhvoice') {
