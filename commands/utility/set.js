@@ -58,6 +58,14 @@ module.exports = {
                 .setName('star_url')
                 .setDescription('Set the URL for your STAR TTS server (e.g. http://my-server:7774)')
                 .addStringOption(option =>
+                    option.setName('target')
+                        .setDescription('Who is this URL for?')
+                        .setRequired(true)
+                        .addChoices(
+                            { name: 'Me (User Preference)', value: 'user' },
+                            { name: 'Server (Default)', value: 'server' }
+                        ))
+                .addStringOption(option =>
                     option.setName('url')
                         .setDescription('The API URL (include http:// or https://)')
                         .setRequired(true)))
@@ -263,8 +271,13 @@ module.exports = {
 
         } else if (subcommand === 'star_url') {
             // --- STAR URL Logic ---
+            const target = interaction.options.getString('target');
             const url = interaction.options.getString('url');
             
+            if (target === 'server' && !interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+                return interaction.reply({ content: 'You need Manage Guild permissions to set the Server STAR URL.', ephemeral: true });
+            }
+
             // Basic validation
             if (!url.startsWith('http')) {
                 return interaction.reply({ content: '❌ Invalid URL. Please include http:// or https://', ephemeral: true });
@@ -277,15 +290,19 @@ module.exports = {
                 }
             } catch (e) {}
 
-            // Save to user settings by default (since it's a client preference)
-            if (!settings.users[interaction.user.id]) settings.users[interaction.user.id] = {};
-            settings.users[interaction.user.id].starUrl = url;
-            // Auto-switch to star mode
-            settings.users[interaction.user.id].mode = 'star';
+            if (target === 'user') {
+                if (!settings.users[interaction.user.id]) settings.users[interaction.user.id] = {};
+                settings.users[interaction.user.id].starUrl = url;
+                settings.users[interaction.user.id].mode = 'star';
+                await interaction.reply({ content: `✅ Your **STAR URL** has been set to: \`${url}\`\n✅ Provider switched to **STAR**.` });
+            } else {
+                if (!settings.servers[interaction.guild.id]) settings.servers[interaction.guild.id] = {};
+                settings.servers[interaction.guild.id].starUrl = url;
+                settings.servers[interaction.guild.id].mode = 'star';
+                await interaction.reply({ content: `✅ **Server Default STAR URL** has been set to: \`${url}\`\n✅ Server Default Provider switched to **STAR**.` });
+            }
 
             fs.writeFileSync(ttsSettingsFile, JSON.stringify(settings, null, 2));
-
-            await interaction.reply({ content: `✅ **STAR URL** set to: \`${url}\`\n✅ Provider switched to **STAR**.` });
 
         } else if (subcommand === 'mode') {
             // --- Mode Logic ---
