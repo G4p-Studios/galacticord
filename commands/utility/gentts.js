@@ -16,7 +16,8 @@ module.exports = {
                     { name: 'Google Translate', value: 'google' },
                     { name: 'Piper (High Quality)', value: 'piper' },
                     { name: 'eSpeak-ng (Classic Synth)', value: 'espeak' },
-                    { name: 'RHVoice (Local Natural)', value: 'rhvoice' }
+                    { name: 'RHVoice (Local Natural)', value: 'rhvoice' },
+                    { name: 'STAR (Distributed)', value: 'star' }
                 ))
         .addStringOption(option =>
             option.setName('voice')
@@ -63,6 +64,36 @@ module.exports = {
                 { name: 'Alan (English)', value: 'alan' },
                 { name: 'Aleksandr (Russian)', value: 'aleksandr' }
             ];
+        } else if (mode === 'star') {
+            // Load Settings to get starUrl
+            let settings = { users: {}, servers: {} };
+            try {
+                if (fs.existsSync(path.join(__dirname, '../../data/tts_settings.json'))) {
+                    settings = JSON.parse(fs.readFileSync(path.join(__dirname, '../../data/tts_settings.json'), 'utf8'));
+                }
+            } catch (e) {}
+
+            const userUrl = settings.users[interaction.user.id]?.starUrl || settings.servers[interaction.guild.id]?.starUrl;
+            if (userUrl) {
+                try {
+                    const WebSocket = require('ws');
+                    const wsUrl = userUrl.replace(/^http/, 'ws');
+                    const fetchVoices = () => new Promise((resolve) => {
+                        const ws = new WebSocket(wsUrl);
+                        const timeout = setTimeout(() => { ws.terminate(); resolve([]); }, 2000);
+                        ws.on('open', () => ws.send(JSON.stringify({ user: 4 })));
+                        ws.on('message', (data) => {
+                            try {
+                                const response = JSON.parse(data.toString());
+                                if (response.voices) { resolve(response.voices); ws.close(); }
+                            } catch (e) {}
+                        });
+                        ws.on('error', () => resolve([]));
+                    });
+                    const voiceList = await fetchVoices();
+                    choices = voiceList.map(v => ({ name: v, value: v }));
+                } catch (e) {}
+            }
         }
 
         const filtered = choices.filter(choice => choice.name.toLowerCase().includes(focusedValue.toLowerCase()));
@@ -76,8 +107,23 @@ module.exports = {
         const voice = interaction.options.getString('voice');
         const text = interaction.options.getString('text');
 
+        let finalVoice = voice;
+        if (mode === 'star') {
+            // Load settings to get the URL
+            let settings = { users: {}, servers: {} };
+            try {
+                const settingsPath = path.join(__dirname, '../../data/tts_settings.json');
+                if (fs.existsSync(settingsPath)) {
+                    settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+                }
+            } catch (e) {}
+            const starUrl = settings.users[interaction.user.id]?.starUrl || settings.servers[interaction.guild.id]?.starUrl;
+            if (!starUrl) return interaction.editReply('❌ No STAR URL configured. Use `/set star_url` first.');
+            finalVoice = JSON.stringify({ url: starUrl, voice: voice });
+        }
+
         try {
-            const stream = await getAudioStream(text, mode, voice);
+            const stream = await getAudioStream(text, mode, finalVoice);
             
             // Create a temporary file path
             const tempFile = path.join(__dirname, `../../temp_tts_${interaction.user.id}.wav`);
