@@ -68,8 +68,19 @@ module.exports = {
 
             const serverSetting = settings.servers[guildId];
             const mode = serverSetting?.mode || 'piper';
-            let defaultVoice = mode === 'piper' ? 'models/en_US-amy-medium.onnx' : 'en-US';
-            const voiceKey = serverSetting?.voice || defaultVoice;
+            
+            let defaultVoice = 'en-US';
+            if (mode === 'piper') defaultVoice = 'models/en_US-amy-medium.onnx';
+            
+            let voiceKey = serverSetting?.voice || defaultVoice;
+
+            if (mode === 'star') {
+                const starUrl = serverSetting?.starUrl;
+                voiceKey = JSON.stringify({
+                    url: starUrl,
+                    voice: voiceKey
+                });
+            }
 
             console.log(`[VoiceEvent] ${textToSpeak}`);
             const resource = await getAudioResource(textToSpeak, mode, voiceKey);

@@ -50,8 +50,17 @@ module.exports = {
                             { name: 'Google Translate (Simple, Fast)', value: 'google' },
                             { name: 'Piper (High Quality Local TTS)', value: 'piper' },
                             { name: 'eSpeak-ng (Classic Synth)', value: 'espeak' },
-                            { name: 'RHVoice (Natural local voices)', value: 'rhvoice' }
+                            { name: 'RHVoice (Natural local voices)', value: 'rhvoice' },
+                            { name: 'STAR (Distributed TTS Client)', value: 'star' }
                         )))
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('star_url')
+                .setDescription('Set the URL for your STAR TTS server (e.g. http://my-server:7774)')
+                .addStringOption(option =>
+                    option.setName('url')
+                        .setDescription('The API URL (include http:// or https://)')
+                        .setRequired(true)))
         .addSubcommand(subcommand =>
             subcommand
                 .setName('bot')
@@ -149,6 +158,32 @@ module.exports = {
                 { name: 'Elena (Russian)', value: 'elena' },
                 { name: 'Irina (Russian)', value: 'irina' }
             ];
+        } else if (mode === 'star') {
+            // Fetch from user's configured URL
+            const userUrl = settings.users[interaction.user.id]?.starUrl || settings.servers[interaction.guild.id]?.starUrl;
+            
+            if (!userUrl) {
+                choices = [{ name: '⚠️ Set URL first (/set star_url)', value: 'error' }];
+            } else {
+                try {
+                    // Assume STAR API has a /voices endpoint
+                    const axios = require('axios');
+                    const response = await axios.get(`${userUrl}/voices`, { timeout: 2000 });
+                    
+                    if (Array.isArray(response.data)) {
+                        // Adapt based on actual STAR API structure (assuming list of strings or objects)
+                        choices = response.data.map(v => {
+                            const vName = typeof v === 'string' ? v : (v.name || v.id);
+                            const vId = typeof v === 'string' ? v : (v.id || v.name);
+                            return { name: vName, value: vId };
+                        });
+                    } else if (typeof response.data === 'object') {
+                         choices = Object.keys(response.data).map(k => ({ name: k, value: k }));
+                    }
+                } catch (e) {
+                    choices = [{ name: `❌ Error connecting to ${userUrl}`, value: 'error_conn' }];
+                }
+            }
         }
 
         const filtered = choices.filter(choice => choice.name.toLowerCase().includes(focusedValue.toLowerCase()));
@@ -208,6 +243,32 @@ module.exports = {
 
             await interaction.reply({ content: `✅ Bot messages will now be **${speak ? 'SPOKEN' : 'IGNORED'}**.` });
 
+        } else if (subcommand === 'star_url') {
+            // --- STAR URL Logic ---
+            const url = interaction.options.getString('url');
+            
+            // Basic validation
+            if (!url.startsWith('http')) {
+                return interaction.reply({ content: '❌ Invalid URL. Please include http:// or https://', ephemeral: true });
+            }
+
+            let settings = { users: {}, servers: {} };
+            try {
+                if (fs.existsSync(ttsSettingsFile)) {
+                    settings = JSON.parse(fs.readFileSync(ttsSettingsFile, 'utf8'));
+                }
+            } catch (e) {}
+
+            // Save to user settings by default (since it's a client preference)
+            if (!settings.users[interaction.user.id]) settings.users[interaction.user.id] = {};
+            settings.users[interaction.user.id].starUrl = url;
+            // Auto-switch to star mode
+            settings.users[interaction.user.id].mode = 'star';
+
+            fs.writeFileSync(ttsSettingsFile, JSON.stringify(settings, null, 2));
+
+            await interaction.reply({ content: `✅ **STAR URL** set to: \`${url}\`\n✅ Provider switched to **STAR**.` });
+
         } else if (subcommand === 'mode') {
             // --- Mode Logic ---
             const target = interaction.options.getString('target');
@@ -231,7 +292,7 @@ module.exports = {
                     settings.users[interaction.user.id] = { voice: settings.users[interaction.user.id] };
                 }
                 settings.users[interaction.user.id].mode = provider;
-                const providerMap = { 'google': 'Google Translate', 'piper': 'Piper', 'espeak': 'eSpeak-ng', 'rhvoice': 'RHVoice' };
+                const providerMap = { 'google': 'Google Translate', 'piper': 'Piper', 'espeak': 'eSpeak-ng', 'rhvoice': 'RHVoice', 'star': 'STAR (Distributed)' };
                 const providerName = providerMap[provider] || provider;
                 await interaction.reply({ content: `✅ Your TTS Provider is now: **${providerName}**` });
             } else {
@@ -240,7 +301,7 @@ module.exports = {
                     settings.servers[interaction.guild.id] = { voice: settings.servers[interaction.guild.id] };
                 }
                 settings.servers[interaction.guild.id].mode = provider;
-                const providerMap = { 'google': 'Google Translate', 'piper': 'Piper', 'espeak': 'eSpeak-ng', 'rhvoice': 'RHVoice' };
+                const providerMap = { 'google': 'Google Translate', 'piper': 'Piper', 'espeak': 'eSpeak-ng', 'rhvoice': 'RHVoice', 'star': 'STAR (Distributed)' };
                 const providerName = providerMap[provider] || provider;
                 await interaction.reply({ content: `✅ Server Default TTS Provider is now: **${providerName}**` });
             }

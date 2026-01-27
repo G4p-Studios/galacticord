@@ -29,6 +29,48 @@ module.exports = {
                 const latency = end - start;
                 return sent.edit(`Pong! Latency: ${latency}ms (API Latency: ${Math.round(message.client.ws.ping)}ms)`);
             }
+
+            if (commandName === 'help') {
+                const helpText = `**Galacticord Help (mal! prefix)**\n` +
+                    `- \`mal!ping\`: Check bot latency.\n` +
+                    `- \`mal!help\`: Show this help message.\n\n` +
+                    `**Owner Only Commands:**\n` +
+                    `- \`mal!serverslist\`: List all servers the bot is in.\n` +
+                    `- \`mal!shutdown\`: Power off the bot.\n` +
+                    `- \`mal!restart\`: Restart the bot.\n` +
+                    `- \`mal!freshpull\`: Pull the latest code from GitHub.`;
+                return message.reply(helpText);
+            }
+
+            // Owner Only Commands
+            const ownerId = '1365401272798281850';
+            if (message.author.id === ownerId) {
+                if (commandName === 'serverslist') {
+                    const guilds = message.client.guilds.cache.map(g => `${g.name} (${g.id})`).join('\n');
+                    return message.reply(`**Servers List:**\n${guilds || 'No servers found.'}`);
+                }
+
+                if (commandName === 'shutdown') {
+                    await message.reply('Shutting down...');
+                    process.exit();
+                }
+
+                if (commandName === 'restart') {
+                    await message.reply('Restarting...');
+                    // In a production environment with PM2 or a similar process manager, 
+                    // exiting will trigger an automatic restart.
+                    process.exit();
+                }
+
+                if (commandName === 'freshpull') {
+                    await message.reply('Pulling latest updates from GitHub...');
+                    const { exec } = require('child_process');
+                    exec('git pull origin main', (err, stdout, stderr) => {
+                        if (err) return message.reply(`Error: ${err.message}`);
+                        message.reply(`**Git Pull Success:**\n\`\`\`\n${stdout}\`\`\``);
+                    });
+                }
+            }
         }
 
         // Load Server Config
@@ -137,7 +179,24 @@ module.exports = {
             let defaultVoice = 'en-US';
             if (mode === 'piper') defaultVoice = 'models/en_US-amy-medium.onnx';
 
-            const voiceKey = userVoice || serverVoice || defaultVoice;
+            let voiceKey = userVoice || serverVoice || defaultVoice;
+
+            // SPECIAL HANDLING FOR STAR
+            if (mode === 'star') {
+                const starUrl = userSetting?.starUrl || serverSetting?.starUrl;
+                if (!starUrl) {
+                    console.log(`[MessageCreate] STAR mode selected but no URL found.`);
+                    // Fallback to piper to avoid silence/crash if URL is missing
+                    // mode = 'piper'; // Can't easily switch mode var here, so we just log warning.
+                }
+                // Pack URL and Voice into the key for ttsProvider to unpack
+                voiceKey = JSON.stringify({
+                    url: starUrl,
+                    voice: voiceKey
+                });
+            }
+
+            console.log(`[MessageCreate Debug] Determined Mode: ${mode}, VoiceKey: ${mode === 'star' ? '(Hidden JSON)' : voiceKey}`);
 
             // Clean content of mentions
             let cleanContent = message.content;

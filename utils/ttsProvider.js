@@ -103,6 +103,52 @@ async function getAudioStream(text, provider, voiceKey) {
                 rhvoiceProcess.stdin.end();
             }
             return rhvoiceProcess.stdout;
+
+        } else if (cleanProvider === 'star') {
+            // STAR Distributed Client Logic
+            // The voiceKey for STAR is expected to be a JSON string: '{"url":"...","voice":"..."}'
+            // This is constructed in messageCreate.js
+            let starConfig = {};
+            try {
+                starConfig = JSON.parse(voiceKey);
+            } catch (e) {
+                throw new Error("Invalid STAR configuration. Please set your URL with /set star_url");
+            }
+
+            const { url, voice } = starConfig;
+            if (!url) throw new Error("STAR URL is missing. Use /set star_url");
+
+            console.log(`[STAR Debug] Fetching from ${url} with voice ${voice}`);
+
+            // Construct the request. Assuming standard simple API: /synthesize?text=...&voice=...
+            // If the user's specific "STAR" implementation differs, this is where it would need adjustment.
+            // Using POST is usually safer for long text.
+            const targetUrl = `${url}/synthesize`; 
+            
+            // Try POST first (common for modern TTS servers)
+            try {
+                const response = await axios.post(targetUrl, {
+                    text: sanitizedText,
+                    voice: voice || 'default'
+                }, {
+                    responseType: 'stream',
+                    timeout: 10000 // 10 second timeout
+                });
+                return response.data;
+            } catch (postError) {
+                console.log(`[STAR Debug] POST failed, trying GET... (${postError.message})`);
+                // Fallback to GET
+                try {
+                    const getUrl = `${url}/synthesize?text=${encodeURIComponent(sanitizedText)}&voice=${encodeURIComponent(voice || 'default')}`;
+                    const response = await axios.get(getUrl, {
+                        responseType: 'stream',
+                        timeout: 10000
+                    });
+                    return response.data;
+                } catch (getError) {
+                    throw new Error(`Failed to fetch audio from STAR server: ${getError.message}`);
+                }
+            }
         }
         throw new Error("Unknown provider");
     } catch (error) {
