@@ -8,16 +8,33 @@ const guildQueues = new Map();
  * Creates an audio resource for a radio stream URL (ffmpeg).
  */
 function createRadioResource(url) {
+    console.log(`[AudioQueue] Creating radio stream from: ${url}`);
+    
+    // Using standard ffmpeg to pipe mp3/opus data to Discord.js
+    // This is often more stable than raw PCM for internet radio streams.
     const ffmpeg = spawn('ffmpeg', [
+        '-re', // Read input at native frame rate
         '-i', url,
-        '-f', 's16le',
-        '-ar', '48000',
-        '-ac', '2',
+        '-ac', '2', // Stereo
+        '-f', 'mp3', // Output format
         'pipe:1'
     ]);
     
+    ffmpeg.stderr.on('data', (data) => {
+        // Uncomment to debug detailed ffmpeg logs
+        // console.error(`[FFmpeg Log] ${data.toString()}`);
+    });
+
+    ffmpeg.on('error', (err) => {
+        console.error(`[FFmpeg Error] Failed to spawn ffmpeg: ${err.message}`);
+    });
+
+    ffmpeg.on('close', (code) => {
+        if (code !== 0) console.log(`[FFmpeg] Process exited with code ${code}`);
+    });
+    
     return createAudioResource(ffmpeg.stdout, {
-        inputType: StreamType.Raw,
+        inputType: StreamType.Arbitrary,
         inlineVolume: true
     });
 }
