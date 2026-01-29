@@ -1,16 +1,39 @@
 const { createAudioPlayer, AudioPlayerStatus, createAudioResource, StreamType } = require('@discordjs/voice');
+const fs = require('fs');
 
 // Global Map to store queues and players per guild
 const guildQueues = new Map();
 
 /**
- * Creates an audio resource for a radio stream URL directly.
+ * Creates an audio resource for a radio stream.
+ * Handles direct URLs and local .m3u playlist files.
  */
-function createRadioResource(url) {
-    console.log(`[AudioQueue] Creating radio stream from: ${url}`);
+function createRadioResource(input) {
+    console.log(`[AudioQueue] Creating radio stream from: ${input}`);
     
+    let resourceUrl = input;
+
+    // Check if input is a local file
+    if (fs.existsSync(input)) {
+        try {
+            const content = fs.readFileSync(input, 'utf8');
+            // Find the first line that isn't a comment (#) and looks like a URL
+            const lines = content.split('\n');
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (trimmed && !trimmed.startsWith('#') && trimmed.startsWith('http')) {
+                    console.log(`[AudioQueue] Extracted URL from M3U: ${trimmed}`);
+                    resourceUrl = trimmed;
+                    break;
+                }
+            }
+        } catch (e) {
+            console.error(`[AudioQueue Error] Failed to read M3U file: ${e.message}`);
+        }
+    }
+
     // Direct stream creation - much more stable for HTTP MP3 streams
-    return createAudioResource(url, {
+    return createAudioResource(resourceUrl, {
         inputType: StreamType.Arbitrary,
         inlineVolume: true
     });
