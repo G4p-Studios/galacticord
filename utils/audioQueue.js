@@ -1,39 +1,16 @@
 const { createAudioPlayer, AudioPlayerStatus, createAudioResource, StreamType } = require('@discordjs/voice');
-const { spawn } = require('child_process');
 
 // Global Map to store queues and players per guild
 const guildQueues = new Map();
 
 /**
- * Creates an audio resource for a radio stream URL (ffmpeg).
+ * Creates an audio resource for a radio stream URL directly.
  */
 function createRadioResource(url) {
     console.log(`[AudioQueue] Creating radio stream from: ${url}`);
     
-    const ffmpeg = spawn('ffmpeg', [
-        '-re',
-        '-i', url,
-        '-ac', '2',
-        '-f', 'mp3',
-        'pipe:1'
-    ], {
-        stdio: ['ignore', 'pipe', 'pipe'] // Ignore stdin, pipe stdout/stderr
-    });
-    
-    ffmpeg.stderr.on('data', (data) => {
-        // Uncomment for detailed ffmpeg logs
-        // console.error(`[FFmpeg Log] ${data.toString()}`);
-    });
-
-    ffmpeg.on('error', (err) => {
-        console.error(`[FFmpeg Error] Failed to spawn ffmpeg: ${err.message}`);
-    });
-
-    ffmpeg.on('close', (code) => {
-        if (code !== 0) console.log(`[FFmpeg] Process exited with code ${code}`);
-    });
-    
-    return createAudioResource(ffmpeg.stdout, {
+    // Direct stream creation - much more stable for HTTP MP3 streams
+    return createAudioResource(url, {
         inputType: StreamType.Arbitrary,
         inlineVolume: true
     });
