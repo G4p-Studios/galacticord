@@ -10,18 +10,18 @@ const guildQueues = new Map();
 function createRadioResource(url) {
     console.log(`[AudioQueue] Creating radio stream from: ${url}`);
     
-    // Using standard ffmpeg to pipe mp3/opus data to Discord.js
-    // This is often more stable than raw PCM for internet radio streams.
     const ffmpeg = spawn('ffmpeg', [
-        '-re', // Read input at native frame rate
+        '-re',
         '-i', url,
-        '-ac', '2', // Stereo
-        '-f', 'mp3', // Output format
+        '-ac', '2',
+        '-f', 'mp3',
         'pipe:1'
-    ]);
+    ], {
+        stdio: ['ignore', 'pipe', 'pipe'] // Ignore stdin, pipe stdout/stderr
+    });
     
     ffmpeg.stderr.on('data', (data) => {
-        // Uncomment to debug detailed ffmpeg logs
+        // Uncomment for detailed ffmpeg logs
         // console.error(`[FFmpeg Log] ${data.toString()}`);
     });
 
