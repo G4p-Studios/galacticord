@@ -1,23 +1,21 @@
 const { createAudioPlayer, AudioPlayerStatus, createAudioResource, StreamType } = require('@discordjs/voice');
 const fs = require('fs');
+const { spawn } = require('child_process');
 
 // Global Map to store queues and players per guild
 const guildQueues = new Map();
 
 /**
  * Creates an audio resource for a radio stream.
- * Handles direct URLs and local .m3u playlist files.
+ * Uses ffmpeg to convert to PCM s16le for maximum stability.
  */
 function createRadioResource(input) {
-    console.log(`[AudioQueue] Creating radio stream from: ${input}`);
-    
     let resourceUrl = input;
 
     // Check if input is a local file
     if (fs.existsSync(input)) {
         try {
             const content = fs.readFileSync(input, 'utf8');
-            // Find the first line that isn't a comment (#) and looks like a URL
             const lines = content.split('\n');
             for (const line of lines) {
                 const trimmed = line.trim();
@@ -32,91 +30,103 @@ function createRadioResource(input) {
         }
     }
 
-    // Direct stream creation - much more stable for HTTP MP3 streams
-    return createAudioResource(resourceUrl, {
-        inputType: StreamType.Arbitrary,
+    console.log(`[AudioQueue] Creating radio stream from: ${resourceUrl}`);
+
+    // Use ffmpeg to ensure stable streaming
+    const ffmpeg = spawn('ffmpeg', [
+        '-re',
+        '-i', resourceUrl,
+        '-f', 's16le',
+        '-ar', '48000',
+        '-ac', '2',
+        'pipe:1'
+    ]);
+
+    ffmpeg.on('error', (err) => {
+        console.error(`[FFmpeg Error] Failed to spawn ffmpeg: ${err.message}`);
+    });
+
+    ffmpeg.on('close', (code) => {
+        if (code !== 0 && code !== null) console.log(`[FFmpeg] Process exited with code ${code}`);
+    });
+
+    return createAudioResource(ffmpeg.stdout, {
+        inputType: StreamType.Raw,
         inlineVolume: true
     });
 }
 
-function setBackground(guildId, url, connection) {
-    let guildData = guildQueues.get(guildId);
-    
-    if (!guildData) {
+function initGuildData(guildId) {
+    if (!guildQueues.has(guildId)) {
         const player = createAudioPlayer();
-        guildData = { player, queue: [], backgroundUrl: null };
+        const guildData = { 
+            player, 
+            queue: [], 
+            backgroundUrl: null,
+            isPlayingTTS: false 
+        };
         guildQueues.set(guildId, guildData);
 
         player.on(AudioPlayerStatus.Idle, () => {
             const currentData = guildQueues.get(guildId);
-            if (currentData && currentData.queue.length > 0) {
+            if (!currentData) return;
+
+            // If we have more TTS messages, play the next one
+            if (currentData.queue.length > 0) {
+                console.log(`[AudioQueue] Playing next TTS message from queue.`);
                 const nextResource = currentData.queue.shift();
+                currentData.isPlayingTTS = true;
                 player.play(nextResource);
-            } else if (currentData && currentData.backgroundUrl) {
-                console.log(`[AudioQueue] Queue empty. Resuming background stream: ${currentData.backgroundUrl}`);
-                const bgResource = createRadioResource(currentData.backgroundUrl);
-                player.play(bgResource);
+            } else {
+                // No more TTS. Resume background if available.
+                currentData.isPlayingTTS = false;
+                if (currentData.backgroundUrl) {
+                    console.log(`[AudioQueue] Queue empty. Resuming background stream.`);
+                    const bgResource = createRadioResource(currentData.backgroundUrl);
+                    player.play(bgResource);
+                }
             }
         });
 
         player.on('error', error => {
             console.error(`[AudioQueue Error] Player error for Guild ${guildId}:`, error.message);
+            // On error, try to move to next item
+            const currentData = guildQueues.get(guildId);
+            if (currentData && currentData.queue.length > 0) {
+                currentData.queue.shift(); // Remove broken item
+                // Idle event will trigger next play
+            }
         });
     }
+    return guildQueues.get(guildId);
+}
 
+function setBackground(guildId, url, connection) {
+    const guildData = initGuildData(guildId);
     guildData.backgroundUrl = url;
     connection.subscribe(guildData.player);
 
-    // If currently idle or playing another background stream, play immediately
-    // If playing TTS (queue not empty), wait for it to finish
-    if (guildData.queue.length === 0) {
-        console.log(`[AudioQueue] Starting background stream immediately.`);
+    // Only start background if NOT currently playing a TTS message
+    if (!guildData.isPlayingTTS) {
+        console.log(`[AudioQueue] Starting background stream.`);
         const bgResource = createRadioResource(url);
         guildData.player.play(bgResource);
     }
 }
 
 function addToQueue(guildId, resource, connection) {
-    if (!guildQueues.has(guildId)) {
-        const player = createAudioPlayer();
-        guildQueues.set(guildId, {
-            player: player,
-            queue: [],
-            backgroundUrl: null
-        });
-
-        player.on(AudioPlayerStatus.Idle, () => {
-            const guildData = guildQueues.get(guildId);
-            if (guildData && guildData.queue.length > 0) {
-                const nextResource = guildData.queue.shift();
-                player.play(nextResource);
-            } else if (guildData && guildData.backgroundUrl) {
-                console.log(`[AudioQueue] Queue empty. Resuming background stream: ${guildData.backgroundUrl}`);
-                const bgResource = createRadioResource(guildData.backgroundUrl);
-                player.play(bgResource);
-            }
-        });
-
-        player.on('error', error => {
-            console.error(`[AudioQueue Error] Player error for Guild ${guildId}:`, error.message);
-        });
-    }
-
-    const guildData = guildQueues.get(guildId);
+    const guildData = initGuildData(guildId);
     connection.subscribe(guildData.player);
 
-    // TTS Priority Logic:
-    // If player is IDLE or playing BACKGROUND (empty queue), play TTS immediately (interrupt background)
-    // If player is playing ANOTHER TTS (queue has items), add to queue
-    
-    if (guildData.queue.length === 0) {
-        console.log(`[AudioQueue] Interrupting/Starting immediate playback for TTS.`);
-        guildData.player.play(resource);
-        // Note: If background was playing, it stops automatically when we play() something else.
-        // The Idle event will eventually fire after this TTS is done to resume background.
-    } else {
+    // If currently playing a TTS message, add to queue
+    if (guildData.isPlayingTTS) {
         guildData.queue.push(resource);
-        console.log(`[AudioQueue] Added to queue for Guild ${guildId}. Current queue size: ${guildData.queue.length}`);
+        console.log(`[AudioQueue] Added to queue. Size: ${guildData.queue.length}`);
+    } else {
+        // If Idle OR playing Background, interrupt and play TTS immediately
+        console.log(`[AudioQueue] Interrupting for TTS playback.`);
+        guildData.isPlayingTTS = true;
+        guildData.player.play(resource);
     }
 }
 
