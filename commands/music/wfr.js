@@ -22,7 +22,7 @@ module.exports = {
                 adapterCreator: interaction.guild.voiceAdapterCreator,
             });
 
-            const radioUrl = 'https://beats.seedy.cc:9005/public/wfr';
+            const radioUrl = 'https://beats.seedy.cc:9005/listen/wfr/radio.mp3';
             
             // This function sets the background stream.
             // It plays immediately if no TTS is queued.
