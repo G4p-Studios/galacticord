@@ -42,6 +42,14 @@ function createRadioResource(input) {
         'pipe:1'
     ]);
 
+    ffmpeg.stderr.on('data', (data) => {
+        // Only log errors or warnings to avoid spamming the console with stats
+        const msg = data.toString();
+        if (msg.includes('Error') || msg.includes('Invalid') || msg.includes('404')) {
+            console.error(`[FFmpeg Log] ${msg.trim()}`);
+        }
+    });
+
     ffmpeg.on('error', (err) => {
         console.error(`[FFmpeg Error] Failed to spawn ffmpeg: ${err.message}`);
     });
