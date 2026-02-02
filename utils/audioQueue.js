@@ -40,7 +40,11 @@ function createRadioResource(input) {
     // Added a more common browser User-Agent and connection flags
     const ffmpeg = spawn('ffmpeg', [
         '-headers', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n',
+        '-reconnect', '1',
+        '-reconnect_streamed', '1',
+        '-reconnect_delay_max', '5',
         '-i', resourceUrl,
+        '-map_metadata', '-1', // Strip metadata to prevent raw stream corruption
         '-f', 's16le',
         '-ar', '48000',
         '-ac', '2',
