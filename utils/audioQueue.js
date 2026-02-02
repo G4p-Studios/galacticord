@@ -34,8 +34,12 @@ function createRadioResource(input) {
     console.log(`[AudioQueue] Creating radio stream from: ${resourceUrl}`);
 
     // Use ffmpeg to ensure stable streaming
+    // Added User-Agent and reconnect flags to handle picky radio servers
     const ffmpeg = spawn('ffmpeg', [
-        '-re',
+        '-headers', 'User-Agent: Galacticord/1.0\r\n',
+        '-reconnect', '1',
+        '-reconnect_streamed', '1',
+        '-reconnect_delay_max', '5',
         '-i', resourceUrl,
         '-f', 's16le',
         '-ar', '48000',
@@ -56,7 +60,7 @@ function createRadioResource(input) {
     });
 
     return createAudioResource(ffmpeg.stdout, {
-        inputType: StreamType.Raw,
+        inputType: StreamType.Arbitrary,
         inlineVolume: true
     });
 }
