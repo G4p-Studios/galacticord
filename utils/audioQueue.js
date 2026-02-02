@@ -10,33 +10,54 @@ const lastRestart = new Map();
 
 /**
  * Creates an audio resource for a radio stream.
- * Uses ffmpeg to convert to PCM s16le for maximum stability.
+ * Uses curl -> ffmpeg pipe for maximum stability on Linux.
  */
 function createRadioResource(resourceUrl) {
-    console.log(`[AudioQueue] Opening stream: ${resourceUrl}`);
+    console.log(`[AudioQueue] Opening stream via curl|ffmpeg: ${resourceUrl}`);
 
-    // Use ffmpeg to ensure stable streaming
-    // Added a more common browser User-Agent and connection flags
+    // Spawn Curl to handle the network connection
+    const curl = spawn('curl', [
+        '-L', // Follow redirects
+        '-k', // Insecure (skip cert check if needed)
+        '-A', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        resourceUrl
+    ]);
+
+    // Spawn FFmpeg to handle decoding from stdin (pipe:0)
     const ffmpeg = spawn('ffmpeg', [
-        '-headers', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n',
-        '-i', resourceUrl,
-        '-map_metadata', '-1', // Strip metadata to prevent raw stream corruption
+        '-i', 'pipe:0',
+        '-map_metadata', '-1',
         '-f', 's16le',
         '-ar', '48000',
         '-ac', '2',
         'pipe:1'
     ]);
 
+    // Pipe curl output to ffmpeg input
+    curl.stdout.pipe(ffmpeg.stdin);
+
+    curl.stderr.on('data', (d) => {
+        // console.log(`[Curl] ${d.toString()}`); // debug if needed
+    });
+    
+    curl.on('error', (err) => console.error(`[Curl Error] ${err.message}`));
+    curl.on('close', (code) => {
+        if (code !== 0) console.error(`[Curl] Exited with code ${code}`);
+        // If curl dies, close ffmpeg input to finish the stream
+        ffmpeg.stdin.end();
+    });
+
     ffmpeg.stderr.on('data', (data) => {
-        // Log EVERYTHING so we can see why it dies
-        console.error(`[FFmpeg Raw] ${data.toString().trim()}`);
+        const msg = data.toString().trim();
+        if (msg.includes('Error') || msg.includes('failed') || msg.includes('Invalid')) {
+            console.error(`[FFmpeg Raw] ${msg}`);
+        }
     });
 
     ffmpeg.on('error', (err) => {
         console.error(`[FFmpeg Error] ${err.message}`);
     });
 
-    // We use StreamType.Raw because we are outputting raw s16le PCM 48k Stereo
     return createAudioResource(ffmpeg.stdout, {
         inputType: StreamType.Raw,
         inlineVolume: true
@@ -71,16 +92,16 @@ function initGuildData(guildId) {
                     const now = Date.now();
                     const lastTime = lastRestart.get(guildId) || 0;
                     
-                    // 5 second cooldown to prevent restart loops
-                    if (now - lastTime < 5000) {
-                        console.log(`[AudioQueue] Background stream ended too quickly. Waiting for cooldown...`);
+                    // 60 second cooldown as requested
+                    if (now - lastTime < 60000) {
+                        console.log(`[AudioQueue] Stream ended. Waiting 60s cooldown before reconnecting...`);
                         setTimeout(() => {
                             if (currentData.backgroundUrl && !currentData.isPlayingTTS) {
-                                console.log(`[AudioQueue] Resuming background stream after cooldown.`);
+                                console.log(`[AudioQueue] Resuming background stream.`);
                                 lastRestart.set(guildId, Date.now());
                                 player.play(createRadioResource(currentData.backgroundUrl));
                             }
-                        }, 5000);
+                        }, 60000);
                     } else {
                         console.log(`[AudioQueue] Queue empty. Resuming background stream.`);
                         lastRestart.set(guildId, now);
