@@ -48,11 +48,8 @@ function createRadioResource(input) {
     ]);
 
     ffmpeg.stderr.on('data', (data) => {
-        const msg = data.toString().trim();
-        // Only log relevant connection/error info
-        if (msg.includes('HTTP') || msg.includes('Error') || msg.includes('failed') || msg.includes('Invalid')) {
-            console.error(`[FFmpeg Engine] ${msg}`);
-        }
+        // Log EVERYTHING so we can see why it dies
+        console.error(`[FFmpeg Raw] ${data.toString().trim()}`);
     });
 
     ffmpeg.on('error', (err) => {
