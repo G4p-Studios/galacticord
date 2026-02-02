@@ -130,6 +130,18 @@ function setBackground(guildId, url, connection) {
     }
 }
 
+function stopBackground(guildId) {
+    const guildData = guildQueues.get(guildId);
+    if (guildData) {
+        console.log(`[AudioQueue] Stopping background radio.`);
+        guildData.backgroundUrl = null;
+        // If currently playing the radio (not TTS), stop immediately
+        if (!guildData.isPlayingTTS) {
+            guildData.player.stop();
+        }
+    }
+}
+
 function addToQueue(guildId, resource, connection) {
     const guildData = initGuildData(guildId);
     connection.subscribe(guildData.player);
@@ -144,4 +156,4 @@ function addToQueue(guildId, resource, connection) {
     }
 }
 
-module.exports = { addToQueue, setBackground };
+module.exports = { addToQueue, setBackground, stopBackground };
