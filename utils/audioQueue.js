@@ -14,6 +14,7 @@ function createRadioResource(input) {
 
     // Check if input is a local file
     if (fs.existsSync(input)) {
+        console.log(`[AudioQueue] Reading M3U file from: ${input}`);
         try {
             const content = fs.readFileSync(input, 'utf8');
             const lines = content.split('\n');
@@ -43,10 +44,10 @@ function createRadioResource(input) {
     ]);
 
     ffmpeg.stderr.on('data', (data) => {
-        // Only log errors or warnings to avoid spamming the console with stats
+        // Log only critical errors or connection issues to avoid spam
         const msg = data.toString();
-        if (msg.includes('Error') || msg.includes('Invalid') || msg.includes('404')) {
-            console.error(`[FFmpeg Log] ${msg.trim()}`);
+        if (msg.includes('Error') || msg.includes('failed') || msg.includes('404') || msg.includes('Unable')) {
+            console.error(`[FFmpeg Error Log] ${msg.trim()}`);
         }
     });
 
