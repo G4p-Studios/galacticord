@@ -44,11 +44,7 @@ function createRadioResource(input) {
     ]);
 
     ffmpeg.stderr.on('data', (data) => {
-        // Log only critical errors or connection issues to avoid spam
-        const msg = data.toString();
-        if (msg.includes('Error') || msg.includes('failed') || msg.includes('404') || msg.includes('Unable')) {
-            console.error(`[FFmpeg Error Log] ${msg.trim()}`);
-        }
+        console.error(`[FFmpeg Log] ${data.toString().trim()}`);
     });
 
     ffmpeg.on('error', (err) => {
