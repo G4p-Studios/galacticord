@@ -12,37 +12,13 @@ const lastRestart = new Map();
  * Creates an audio resource for a radio stream.
  * Uses ffmpeg to convert to PCM s16le for maximum stability.
  */
-function createRadioResource(input) {
-    let resourceUrl = input;
-
-    // Check if input is a local file (like radio.m3u)
-    if (fs.existsSync(input)) {
-        console.log(`[AudioQueue] Reading M3U file: ${input}`);
-        try {
-            const content = fs.readFileSync(input, 'utf8');
-            const lines = content.split('\n');
-            for (const line of lines) {
-                const trimmed = line.trim();
-                // Find first line that is a URL
-                if (trimmed && !trimmed.startsWith('#') && trimmed.startsWith('http')) {
-                    resourceUrl = trimmed;
-                    break;
-                }
-            }
-        } catch (e) {
-            console.error(`[AudioQueue Error] Failed to read M3U: ${e.message}`);
-        }
-    }
-
+function createRadioResource(resourceUrl) {
     console.log(`[AudioQueue] Opening stream: ${resourceUrl}`);
 
     // Use ffmpeg to ensure stable streaming
     // Added a more common browser User-Agent and connection flags
     const ffmpeg = spawn('ffmpeg', [
         '-headers', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n',
-        '-reconnect', '1',
-        '-reconnect_streamed', '1',
-        '-reconnect_delay_max', '5',
         '-i', resourceUrl,
         '-map_metadata', '-1', // Strip metadata to prevent raw stream corruption
         '-f', 's16le',
