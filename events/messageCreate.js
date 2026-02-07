@@ -196,7 +196,26 @@ module.exports = {
             console.log(`[MessageCreate Debug] Determined Mode: ${mode}, VoiceKey: ${mode === 'star' ? '(Hidden JSON)' : voiceKey}`);
 
             // Clean content of mentions
-            let cleanContent = message.content;
+            let contentToClean = message.content;
+
+            // --- Embed Reading Logic ---
+            if (message.embeds && message.embeds.length > 0) {
+                let embedText = "";
+                for (const embed of message.embeds) {
+                    if (embed.author?.name) embedText += `. From ${embed.author.name}. `;
+                    if (embed.title) embedText += `. ${embed.title}. `;
+                    if (embed.description) embedText += `. ${embed.description}. `;
+                    if (embed.fields && embed.fields.length > 0) {
+                        for (const field of embed.fields) {
+                            embedText += `. ${field.name}: ${field.value}. `;
+                        }
+                    }
+                    if (embed.footer?.text) embedText += `. ${embed.footer.text}. `;
+                }
+                contentToClean += " " + embedText;
+            }
+
+            let cleanContent = contentToClean;
             
             // Replace user mentions <@ID> or <@!ID>
             const userMentionRegex = /<@!?(\d+)>/g;
