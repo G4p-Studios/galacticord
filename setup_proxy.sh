@@ -16,8 +16,15 @@ wget -q --show-progress -O urnetwork-proxy.tar.gz "$URL"
 
 # 3. Extract
 echo "[2/3] Extracting..."
-tar -xzf urnetwork-proxy.tar.gz -C ~/urnetwork
+# List contents to see if it's a folder or binary
+tar -tf urnetwork-proxy.tar.gz
+# Extract everything into the urnetwork directory, flattening any top-level folder
+tar -xzf urnetwork-proxy.tar.gz -C ~/urnetwork --strip-components=1 2>/dev/null || tar -xzf urnetwork-proxy.tar.gz -C ~/urnetwork
 rm urnetwork-proxy.tar.gz
+
+# Check for the binary and make it executable
+cd ~/urnetwork
+chmod +x urnetwork-proxy-socks 2>/dev/null || chmod +x *proxy*
 
 echo "---------------------------------------------------"
 echo "[3/3] Setup Complete!"
