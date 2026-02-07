@@ -71,6 +71,22 @@ module.exports = {
                         .setRequired(true)))
         .addSubcommand(subcommand =>
             subcommand
+                .setName('music_proxy')
+                .setDescription('Set a proxy for the music player (e.g. socks5://127.0.0.1:9050)')
+                .addStringOption(option =>
+                    option.setName('target')
+                        .setDescription('Who is this proxy for?')
+                        .setRequired(true)
+                        .addChoices(
+                            { name: 'Me (User Preference)', value: 'user' },
+                            { name: 'Server (Default)', value: 'server' }
+                        ))
+                .addStringOption(option =>
+                    option.setName('url')
+                        .setDescription('The proxy URL')
+                        .setRequired(true)))
+        .addSubcommand(subcommand =>
+            subcommand
                 .setName('bot')
                 .setDescription('Set whether the bot should speak messages from other bots.')
                 .addBooleanOption(option =>
@@ -241,6 +257,34 @@ ${url}
 ${url}
 ✅ Server Default Provider switched to **STAR**.` });
             }
+            fs.writeFileSync(ttsSettingsFile, JSON.stringify(settings, null, 2));
+
+        } else if (subcommand === 'music_proxy') {
+            // --- Music Proxy Logic ---
+            const target = interaction.options.getString('target');
+            const url = interaction.options.getString('url');
+
+            if (target === 'server' && !interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+                return interaction.reply({ content: 'You need Manage Guild permissions to set the Server Music Proxy.', ephemeral: true });
+            }
+
+            let settings = { users: {}, servers: {} };
+            try {
+                if (fs.existsSync(ttsSettingsFile)) {
+                    settings = JSON.parse(fs.readFileSync(ttsSettingsFile, 'utf8'));
+                }
+            } catch (e) {}
+
+            if (target === 'user') {
+                if (!settings.users[interaction.user.id]) settings.users[interaction.user.id] = {};
+                settings.users[interaction.user.id].musicProxy = url;
+                await interaction.reply({ content: `✅ Your **Music Proxy** has been set to: \`${url}\`` });
+            } else {
+                if (!settings.servers[interaction.guild.id]) settings.servers[interaction.guild.id] = {};
+                settings.servers[interaction.guild.id].musicProxy = url;
+                await interaction.reply({ content: `✅ **Server Default Music Proxy** has been set to: \`${url}\`` });
+            }
+
             fs.writeFileSync(ttsSettingsFile, JSON.stringify(settings, null, 2));
 
         } else if (subcommand === 'mode') {

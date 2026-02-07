@@ -115,11 +115,25 @@ async function playNext(guildId, client) {
             '--no-cache-dir',
             '-o', '-',
             '-f', 'ba/ba*',
-            // ANDROID BYPASS: Force only the Android client and skip all blocked clients
             '--extractor-args', 'youtube:player_client=android;player_skip=web,ios,tv,mweb,web_embedded',
             '--user-agent', 'com.google.android.youtube/19.29.37 (Linux; U; Android 11; en_US; Pixel 5; Build/RQ3A.210605.005)',
             '--referer', 'https://www.youtube.com/'
         ];
+
+        // --- Proxy Logic ---
+        let settings = { users: {}, servers: {} };
+        const settingsPath = path.join(__dirname, '../../data/tts_settings.json');
+        try {
+            if (fs.existsSync(settingsPath)) {
+                settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+            }
+        } catch (e) {}
+
+        const serverProxy = settings.servers[guildId]?.musicProxy;
+        if (serverProxy) {
+            musicArgs.push('--proxy', serverProxy);
+            console.log(`[Music Debug] Using Proxy: ${serverProxy}`);
+        }
 
         // Check for cookies.txt in the data folder
         const cookiePath = path.join(__dirname, '../../data/cookies.txt');
@@ -164,6 +178,7 @@ async function playNext(guildId, client) {
                     '--extractor-args', 'youtube:player_client=android;player_skip=web,ios,tv,mweb,web_embedded'
                 ];
                 if (fs.existsSync(cookiePath)) diagArgs.push('--cookies', cookiePath);
+                if (serverProxy) diagArgs.push('--proxy', serverProxy);
                 
                 const diag = spawn(binaryPath, diagArgs);
                 let diagOutput = '';
