@@ -29,8 +29,12 @@ const client = new Client({
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.GuildModeration,
+        GatewayIntentBits.GuildEmojisAndStickers,
+        GatewayIntentBits.GuildInvites,
+        GatewayIntentBits.GuildWebhooks,
     ],
-    partials: [Partials.Message, Partials.Channel, Partials.Reaction],
+    partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.GuildMember, Partials.User],
 });
 
 client.commands = new Collection();

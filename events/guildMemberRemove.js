@@ -2,12 +2,12 @@ const { Events, EmbedBuilder } = require('discord.js');
 const { sendLog } = require('../utils/logger');
 
 module.exports = {
-    name: Events.GuildMemberAdd,
+    name: Events.GuildMemberRemove,
     async execute(member) {
         const embed = new EmbedBuilder()
-            .setTitle('Member Joined')
-            .setColor(0x00FF00)
-            .setDescription(`${member.user.tag} (${member.user.id}) has joined the server.`)
+            .setTitle('Member Left')
+            .setColor(0xFF0000)
+            .setDescription(`${member.user.tag} (${member.user.id}) has left the server.`)
             .setThumbnail(member.user.displayAvatarURL())
             .setTimestamp();
 
