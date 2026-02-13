@@ -22,6 +22,7 @@ module.exports = {
                         .setRequired(true)
                         .addChoices(
                             { name: 'Log Channel', value: 'logChannel' },
+                            { name: 'Moderation Log', value: 'modLog' },
                             { name: 'TTS Channel', value: 'ttsChannel' }
                         ))
                 .addChannelOption(option =>
@@ -218,8 +219,12 @@ module.exports = {
             if (!config[interaction.guild.id]) config[interaction.guild.id] = {};
             config[interaction.guild.id][type] = channel.id;
             fs.writeFileSync(serverConfigFile, JSON.stringify(config, null, 2));
-            const typeName = type === 'logChannel' ? 'Log Channel' : 'TTS Channel';
-            await interaction.reply({ content: `✅ **${typeName}** has been set to ${channel}.` });
+            const typeNames = {
+                'logChannel': 'Log Channel',
+                'modLog': 'Moderation Log',
+                'ttsChannel': 'TTS Channel'
+            };
+            await interaction.reply({ content: `✅ **${typeNames[type] || type}** has been set to ${channel}.` });
 
         } else if (subcommand === 'bot') {
             if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {

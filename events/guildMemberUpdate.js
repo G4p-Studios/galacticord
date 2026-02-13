@@ -1,5 +1,5 @@
 const { Events, EmbedBuilder } = require('discord.js');
-const { sendLog } = require('../utils/logger');
+const { sendLog, sendModLog } = require('../utils/logger');
 
 module.exports = {
     name: Events.GuildMemberUpdate,
@@ -11,6 +11,7 @@ module.exports = {
             .setTimestamp();
 
         let changed = false;
+        let isModerationAction = false;
 
         // Nickname change
         if (oldMember.nickname !== newMember.nickname) {
@@ -47,10 +48,15 @@ module.exports = {
                      .setColor(0x2ECC71);
             }
             changed = true;
+            isModerationAction = true;
         }
 
         if (changed) {
-            await sendLog(newMember.guild, embed);
+            if (isModerationAction) {
+                await sendModLog(newMember.guild, embed);
+            } else {
+                await sendLog(newMember.guild, embed);
+            }
         }
     },
 };

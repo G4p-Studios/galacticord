@@ -1,5 +1,5 @@
 const { Events, EmbedBuilder } = require('discord.js');
-const { sendLog } = require('../utils/logger');
+const { sendModLog } = require('../utils/logger');
 
 module.exports = {
     name: Events.GuildBanRemove,
@@ -11,6 +11,6 @@ module.exports = {
             .setThumbnail(ban.user.displayAvatarURL())
             .setTimestamp();
 
-        await sendLog(ban.guild, embed);
+        await sendModLog(ban.guild, embed);
     },
 };

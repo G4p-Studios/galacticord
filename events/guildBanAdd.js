@@ -1,5 +1,5 @@
 const { Events, EmbedBuilder } = require('discord.js');
-const { sendLog } = require('../utils/logger');
+const { sendModLog } = require('../utils/logger');
 
 module.exports = {
     name: Events.GuildBanAdd,
@@ -12,6 +12,6 @@ module.exports = {
             .addFields({ name: 'Reason', value: ban.reason || 'No reason provided' })
             .setTimestamp();
 
-        await sendLog(ban.guild, embed);
+        await sendModLog(ban.guild, embed);
     },
 };
