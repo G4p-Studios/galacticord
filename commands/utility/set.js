@@ -68,8 +68,9 @@ module.exports = {
                         ))
                 .addStringOption(option =>
                     option.setName('url')
-                        .setDescription('The API URL (include http:// or https://)')
-                        .setRequired(true)))
+                        .setDescription('The API URL (include http:// or https://) or choose a preset.')
+                        .setRequired(true)
+                        .setAutocomplete(true)))
         .addSubcommand(subcommand =>
             subcommand
                 .setName('music_proxy')
@@ -113,7 +114,20 @@ module.exports = {
                         .setRequired(true)
                         .setAutocomplete(true))),
     async autocomplete(interaction) {
-        const focusedValue = interaction.options.getFocused();
+        const focusedOption = interaction.options.getFocused(true);
+        const focusedValue = focusedOption.value;
+        const subcommand = interaction.options.getSubcommand();
+
+        if (subcommand === 'star_url' && focusedOption.name === 'url') {
+            const presets = [
+                { name: 'Default (speech.seedy.cc)', value: 'https://speech.seedy.cc' },
+                { name: 'Mad Gamer (star.mad-gamer.com)', value: 'http://star.mad-gamer.com:7774' },
+                { name: `Other: ${focusedValue}`, value: focusedValue }
+            ];
+            const filtered = presets.filter(p => p.name.toLowerCase().includes(focusedValue.toLowerCase()) || p.value.toLowerCase().includes(focusedValue.toLowerCase()));
+            return await interaction.respond(filtered.slice(0, 25));
+        }
+
         const target = interaction.options.getString('target');
         
         let settings = { users: {}, servers: {} };
