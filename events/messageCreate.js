@@ -195,28 +195,41 @@ module.exports = {
 
             console.log(`[MessageCreate Debug] Determined Mode: ${mode}, VoiceKey: ${mode === 'star' ? '(Hidden JSON)' : voiceKey}`);
 
-            // Clean content of mentions
-            let contentToClean = message.content;
+            // --- Link Preview / URL Cleaning Logic ---
+            // We wait a moment because Discord takes 1-2 seconds to generate embeds (link previews)
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Fetch the message again to get updated embeds
+            const updatedMessage = await message.channel.messages.fetch(message.id).catch(() => message);
 
-            // --- Embed Reading Logic ---
-            if (message.embeds && message.embeds.length > 0) {
-                let embedText = "";
-                for (const embed of message.embeds) {
-                    if (embed.author?.name) embedText += `. From ${embed.author.name}. `;
-                    if (embed.title) embedText += `. ${embed.title}. `;
-                    if (embed.description) embedText += `. ${embed.description}. `;
-                    if (embed.fields && embed.fields.length > 0) {
-                        for (const field of embed.fields) {
-                            embedText += `. ${field.name}: ${field.value}. `;
+            let cleanContent = updatedMessage.content;
+            
+            // Regex to find URLs
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            const urls = cleanContent.match(urlRegex);
+
+            if (urls) {
+                for (const url of urls) {
+                    let replacement = "a link";
+                    try {
+                        const urlObj = new URL(url);
+                        const domain = urlObj.hostname.replace('www.', '');
+                        
+                        // Check if Discord generated an embed for this URL
+                        const embed = updatedMessage.embeds.find(e => e.url === url || (e.data && e.data.url === url));
+                        
+                        if (embed && (embed.title || embed.description)) {
+                            const title = embed.title || (embed.description ? embed.description.substring(0, 50) + "..." : "");
+                            replacement = `a link to ${title} on ${domain}`;
+                        } else {
+                            replacement = `a link to ${domain}`;
                         }
+                    } catch (e) {
+                        replacement = "a link";
                     }
-                    if (embed.footer?.text) embedText += `. ${embed.footer.text}. `;
+                    cleanContent = cleanContent.replace(url, replacement);
                 }
-                contentToClean += " " + embedText;
             }
 
-            let cleanContent = contentToClean;
-            
             // Replace user mentions <@ID> or <@!ID>
             const userMentionRegex = /<@!?(\d+)>/g;
             let match;
