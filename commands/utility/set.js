@@ -121,7 +121,7 @@ module.exports = {
         if (subcommand === 'star_url' && focusedOption.name === 'url') {
             const presets = [
                 { name: 'Default (speech.seedy.cc)', value: 'https://speech.seedy.cc' },
-                { name: 'Mad Gamer (star.mad-gamer.com)', value: 'http://star.mad-gamer.com:7774' },
+                { name: 'Mad Gamer (star.mad-gamer.com)', value: 'https://star.mad-gamer.com' },
                 { name: `Other: ${focusedValue}`, value: focusedValue }
             ];
             const filtered = presets.filter(p => p.name.toLowerCase().includes(focusedValue.toLowerCase()) || p.value.toLowerCase().includes(focusedValue.toLowerCase()));
