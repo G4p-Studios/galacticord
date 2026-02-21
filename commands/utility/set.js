@@ -49,9 +49,7 @@ module.exports = {
                         .setRequired(true)
                         .addChoices(
                             { name: 'Google Translate (Simple, Fast)', value: 'google' },
-                            { name: 'Google Cloud (Official, High Quality)', value: 'google-cloud' },
-                            { name: 'Studio (Premium Voices)', value: 'studio' },
-                            { name: 'HD3 (Chirp - Best Quality)', value: 'hd3' },
+                            { name: 'Google Cloud (Official - Neural, Studio, HD3)', value: 'google-cloud' },
                             { name: 'Piper (High Quality Local TTS)', value: 'piper' },
                             { name: 'eSpeak-ng (Classic Synth)', value: 'espeak' },
                             { name: 'RHVoice (Natural local voices)', value: 'rhvoice' },
@@ -154,36 +152,12 @@ module.exports = {
                 value: key
             }));
         } else if (mode === 'google-cloud') {
-            choices = [
-                { name: 'Neural2 A (English US)', value: 'en-US-Neural2-A' },
-                { name: 'Neural2 C (English US)', value: 'en-US-Neural2-C' },
-                { name: 'Neural2 D (English US)', value: 'en-US-Neural2-D' },
-                { name: 'Neural2 F (English US)', value: 'en-US-Neural2-F' },
-                { name: 'Neural2 G (English US)', value: 'en-US-Neural2-G' },
-                { name: 'Neural2 H (English US)', value: 'en-US-Neural2-H' },
-                { name: 'Neural2 J (English US)', value: 'en-US-Neural2-J' },
-                { name: 'Wavenet A (English US)', value: 'en-US-Wavenet-A' },
-                { name: 'Wavenet C (English US)', value: 'en-US-Wavenet-C' },
-                { name: 'Wavenet D (English US)', value: 'en-US-Wavenet-D' },
-                { name: 'Wavenet F (English US)', value: 'en-US-Wavenet-F' }
-            ];
-        } else if (mode === 'studio') {
-            choices = [
-                { name: 'Studio O (English US)', value: 'en-US-Studio-O' }
-            ];
-        } else if (mode === 'hd3') {
-            choices = [
-                { name: 'Aoede (Chirp3 HD)', value: 'aoede' },
-                { name: 'Charon (Chirp3 HD)', value: 'charon' },
-                { name: 'Fenrir (Chirp3 HD)', value: 'fenrir' },
-                { name: 'Kore (Chirp3 HD)', value: 'kore' },
-                { name: 'Leda (Chirp3 HD)', value: 'leda' },
-                { name: 'Orus (Chirp3 HD)', value: 'orus' },
-                { name: 'Puck (Chirp3 HD)', value: 'puck' },
-                { name: 'Zephyr (Chirp3 HD)', value: 'zephyr' },
-                { name: 'Sulafat (Chirp3 HD)', value: 'sulafat' },
-                { name: 'Achernar (Chirp3 HD)', value: 'achernar' }
-            ];
+            choices = Object.entries(voiceOptions)
+                .filter(([key, value]) => value.gcloud)
+                .map(([key, value]) => ({
+                    name: value.label,
+                    value: key
+                }));
         } else if (mode === 'piper') {
             const modelsDir = path.join(__dirname, '../../models');
             if (fs.existsSync(modelsDir)) {
@@ -355,8 +329,6 @@ ${url}
                 const providerMap = { 
                     'google': 'Google Translate', 
                     'google-cloud': 'Google Cloud (Official)', 
-                    'studio': 'Studio (Premium)', 
-                    'hd3': 'HD3 (Chirp)', 
                     'piper': 'Piper', 
                     'espeak': 'eSpeak-ng', 
                     'rhvoice': 'RHVoice', 
@@ -370,8 +342,6 @@ ${url}
                 const providerMap = { 
                     'google': 'Google Translate', 
                     'google-cloud': 'Google Cloud (Official)', 
-                    'studio': 'Studio (Premium)', 
-                    'hd3': 'HD3 (Chirp)', 
                     'piper': 'Piper', 
                     'espeak': 'eSpeak-ng', 
                     'rhvoice': 'RHVoice', 

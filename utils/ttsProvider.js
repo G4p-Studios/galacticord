@@ -116,43 +116,26 @@ async function getAudioStream(text, provider, voiceKey) {
             return response.data;
 
         } else if (cleanProvider === 'google-cloud') {
-            console.log(`[Google Cloud TTS] Synthesizing...`);
-            const request = {
-                input: { text: sanitizedText },
-                voice: { name: cleanVoiceKey || 'en-US-Neural2-A', languageCode: 'en-US' },
-                audioConfig: { audioEncoding: 'MP3', sampleRateHertz: 24000 },
-            };
-            const [response] = await gCloudClient.synthesizeSpeech(request);
-            console.log(`[Google Cloud TTS] Synthesis successful. Audio size: ${response.audioContent.length} bytes`);
-            return Readable.from(response.audioContent);
-
-        } else if (cleanProvider === 'studio') {
-            console.log(`[Google Cloud Studio] Synthesizing...`);
-            const request = {
-                input: { text: sanitizedText },
-                voice: { name: 'en-US-Studio-O', languageCode: 'en-US' },
-                audioConfig: { audioEncoding: 'MP3', sampleRateHertz: 24000 },
-            };
-            const [response] = await gCloudClient.synthesizeSpeech(request);
-            console.log(`[Google Cloud Studio] Synthesis successful. Audio size: ${response.audioContent.length} bytes`);
-            return Readable.from(response.audioContent);
-
-        } else if (cleanProvider === 'hd3') {
-            // Chirp3 HD voices: en-US-Chirp3-HD-Aoede, en-US-Chirp3-HD-Achernar, etc.
+            console.log(`[Google Cloud TTS] Provider: ${cleanProvider}, Voice: ${cleanVoiceKey}`);
             
-            const voiceName = cleanVoiceKey && cleanVoiceKey.length > 1 
-                ? cleanVoiceKey.charAt(0).toUpperCase() + cleanVoiceKey.slice(1).toLowerCase() 
-                : 'Zephyr';
-            const voice = `en-US-Chirp3-HD-${voiceName}`;
+            let voice = cleanVoiceKey || 'en-US-Neural2-A';
             
-            console.log(`[Google Cloud HD3] Synthesizing with voice: ${voice}...`);
+            // Allow legacy short names for Studio and HD3
+            if (voice === 'studio') voice = 'en-US-Studio-O';
+            if (voice === 'sulafat') voice = 'en-US-Chirp3-HD-Sulafat';
+            if (voice === 'achernar') voice = 'en-US-Chirp3-HD-Achernar';
+            if (['aoede', 'charon', 'fenrir', 'kore', 'leda', 'orus', 'puck', 'zephyr'].includes(voice.toLowerCase())) {
+                voice = `en-US-Chirp3-HD-${voice.charAt(0).toUpperCase() + voice.slice(1).toLowerCase()}`;
+            }
+
+            console.log(`[Google Cloud TTS] Synthesizing with voice: ${voice}...`);
             const request = {
                 input: { text: sanitizedText },
                 voice: { name: voice, languageCode: 'en-US' },
                 audioConfig: { audioEncoding: 'MP3', sampleRateHertz: 24000 },
             };
             const [response] = await gCloudClient.synthesizeSpeech(request);
-            console.log(`[Google Cloud HD3] Synthesis successful. Audio size: ${response.audioContent.length} bytes`);
+            console.log(`[Google Cloud TTS] Synthesis successful. Audio size: ${response.audioContent.length} bytes`);
             return Readable.from(response.audioContent);
 
         } else if (cleanProvider === 'piper') {
