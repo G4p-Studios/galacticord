@@ -10,7 +10,7 @@ const textToSpeech = require('@google-cloud/text-to-speech');
 
 // Initialize Google Cloud TTS Client with API Key from .env
 const gCloudClient = new textToSpeech.TextToSpeechClient({
-    apiKey: process.env.GEMINI_API_KEY
+    apiKey: process.env.GOOGLE_CLOUD_API_KEY
 });
 
 async function init() {} 
