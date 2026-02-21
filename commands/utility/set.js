@@ -180,7 +180,9 @@ module.exports = {
                 { name: 'Leda (Chirp3 HD)', value: 'leda' },
                 { name: 'Orus (Chirp3 HD)', value: 'orus' },
                 { name: 'Puck (Chirp3 HD)', value: 'puck' },
-                { name: 'Zephyr (Chirp3 HD)', value: 'zephyr' }
+                { name: 'Zephyr (Chirp3 HD)', value: 'zephyr' },
+                { name: 'Sulafat (Chirp3 HD)', value: 'sulafat' },
+                { name: 'Achernar (Chirp3 HD)', value: 'achernar' }
             ];
         } else if (mode === 'piper') {
             const modelsDir = path.join(__dirname, '../../models');

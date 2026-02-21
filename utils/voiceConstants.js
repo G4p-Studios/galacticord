@@ -16,5 +16,7 @@ module.exports = {
     'leda': { label: '✨ Chirp3 Leda', provider: 'hd3', voiceKey: 'leda' },
     'orus': { label: '✨ Chirp3 Orus', provider: 'hd3', voiceKey: 'orus' },
     'puck': { label: '✨ Chirp3 Puck', provider: 'hd3', voiceKey: 'puck' },
-    'zephyr': { label: '✨ Chirp3 Zephyr', provider: 'hd3', voiceKey: 'zephyr' }
+    'zephyr': { label: '✨ Chirp3 Zephyr', provider: 'hd3', voiceKey: 'zephyr' },
+    'sulafat': { label: '✨ Chirp3 Sulafat', provider: 'hd3', voiceKey: 'sulafat' },
+    'achernar': { label: '✨ Chirp3 Achernar', provider: 'hd3', voiceKey: 'achernar' }
 };

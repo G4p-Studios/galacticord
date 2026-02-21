@@ -138,12 +138,13 @@ async function getAudioStream(text, provider, voiceKey) {
             return Readable.from(response.audioContent);
 
         } else if (cleanProvider === 'hd3') {
-            // New Chirp3 HD voice names: Aoede, Charon, Fenrir, Kore, Leda, Orus, Puck, Zephyr
-            // Capitalize first letter of voiceKey if provided
+            // Chirp3 HD voices require the -Google suffix.
+            // Expected names: en-US-Chirp3-HD-Aoede-Google, en-US-Chirp3-HD-Zephyr-Google, etc.
+            
             const voiceName = cleanVoiceKey && cleanVoiceKey.length > 1 
                 ? cleanVoiceKey.charAt(0).toUpperCase() + cleanVoiceKey.slice(1).toLowerCase() 
                 : 'Zephyr';
-            const voice = `en-US-Chirp3-HD-${voiceName}`;
+            const voice = `en-US-Chirp3-HD-${voiceName}-Google`;
             
             console.log(`[Google Cloud HD3] Synthesizing with voice: ${voice}...`);
             const request = {
