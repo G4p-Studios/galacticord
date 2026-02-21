@@ -128,10 +128,19 @@ async function getAudioStream(text, provider, voiceKey) {
                 voice = `en-US-Chirp3-HD-${voice.charAt(0).toUpperCase() + voice.slice(1).toLowerCase()}`;
             }
 
-            console.log(`[Google Cloud TTS] Synthesizing with voice: ${voice}...`);
+            // Dynamically determine language code (e.g. en-GB, en-AU, en-IN)
+            let langCode = 'en-US';
+            if (voice.includes('-')) {
+                const parts = voice.split('-');
+                if (parts.length >= 2) {
+                    langCode = `${parts[0]}-${parts[1]}`;
+                }
+            }
+
+            console.log(`[Google Cloud TTS] Synthesizing with voice: ${voice} (${langCode})...`);
             const request = {
                 input: { text: sanitizedText },
-                voice: { name: voice, languageCode: 'en-US' },
+                voice: { name: voice, languageCode: langCode },
                 audioConfig: { audioEncoding: 'MP3', sampleRateHertz: 24000 },
             };
             const [response] = await gCloudClient.synthesizeSpeech(request);
