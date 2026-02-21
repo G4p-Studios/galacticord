@@ -138,13 +138,12 @@ async function getAudioStream(text, provider, voiceKey) {
             return Readable.from(response.audioContent);
 
         } else if (cleanProvider === 'hd3') {
-            // Chirp3 HD voices require the -Google suffix.
-            // Expected names: en-US-Chirp3-HD-Aoede-Google, en-US-Chirp3-HD-Zephyr-Google, etc.
+            // Chirp3 HD voices: en-US-Chirp3-HD-Aoede, en-US-Chirp3-HD-Achernar, etc.
             
             const voiceName = cleanVoiceKey && cleanVoiceKey.length > 1 
                 ? cleanVoiceKey.charAt(0).toUpperCase() + cleanVoiceKey.slice(1).toLowerCase() 
                 : 'Zephyr';
-            const voice = `en-US-Chirp3-HD-${voiceName}-Google`;
+            const voice = `en-US-Chirp3-HD-${voiceName}`;
             
             console.log(`[Google Cloud HD3] Synthesizing with voice: ${voice}...`);
             const request = {
