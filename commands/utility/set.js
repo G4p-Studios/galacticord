@@ -49,6 +49,9 @@ module.exports = {
                         .setRequired(true)
                         .addChoices(
                             { name: 'Google Translate (Simple, Fast)', value: 'google' },
+                            { name: 'Google Cloud (Official, High Quality)', value: 'google-cloud' },
+                            { name: 'Studio (Premium Voices)', value: 'studio' },
+                            { name: 'HD3 (Chirp - Best Quality)', value: 'hd3' },
                             { name: 'Piper (High Quality Local TTS)', value: 'piper' },
                             { name: 'eSpeak-ng (Classic Synth)', value: 'espeak' },
                             { name: 'RHVoice (Natural local voices)', value: 'rhvoice' },
@@ -150,6 +153,29 @@ module.exports = {
                 name: value.label,
                 value: key
             }));
+        } else if (mode === 'google-cloud') {
+            choices = [
+                { name: 'Neural2 A (English US)', value: 'en-US-Neural2-A' },
+                { name: 'Neural2 C (English US)', value: 'en-US-Neural2-C' },
+                { name: 'Neural2 D (English US)', value: 'en-US-Neural2-D' },
+                { name: 'Neural2 F (English US)', value: 'en-US-Neural2-F' },
+                { name: 'Neural2 G (English US)', value: 'en-US-Neural2-G' },
+                { name: 'Neural2 H (English US)', value: 'en-US-Neural2-H' },
+                { name: 'Neural2 J (English US)', value: 'en-US-Neural2-J' },
+                { name: 'Wavenet A (English US)', value: 'en-US-Wavenet-A' },
+                { name: 'Wavenet C (English US)', value: 'en-US-Wavenet-C' },
+                { name: 'Wavenet D (English US)', value: 'en-US-Wavenet-D' },
+                { name: 'Wavenet F (English US)', value: 'en-US-Wavenet-F' }
+            ];
+        } else if (mode === 'studio') {
+            choices = [
+                { name: 'Studio O (English US)', value: 'en-US-Studio-O' }
+            ];
+        } else if (mode === 'hd3') {
+            choices = [
+                { name: 'Sulafat (High Fidelity)', value: 'sulafat' },
+                { name: 'Achernar (High Fidelity)', value: 'achernar' }
+            ];
         } else if (mode === 'piper') {
             const modelsDir = path.join(__dirname, '../../models');
             if (fs.existsSync(modelsDir)) {
@@ -318,13 +344,31 @@ ${url}
                 if (!settings.users[interaction.user.id]) settings.users[interaction.user.id] = {};
                 if (typeof settings.users[interaction.user.id] === 'string') settings.users[interaction.user.id] = { voice: settings.users[interaction.user.id] };
                 settings.users[interaction.user.id].mode = provider;
-                const providerMap = { 'google': 'Google Translate', 'piper': 'Piper', 'espeak': 'eSpeak-ng', 'rhvoice': 'RHVoice', 'star': 'STAR (Distributed)' };
+                const providerMap = { 
+                    'google': 'Google Translate', 
+                    'google-cloud': 'Google Cloud (Official)', 
+                    'studio': 'Studio (Premium)', 
+                    'hd3': 'HD3 (Chirp)', 
+                    'piper': 'Piper', 
+                    'espeak': 'eSpeak-ng', 
+                    'rhvoice': 'RHVoice', 
+                    'star': 'STAR (Distributed)' 
+                };
                 await interaction.reply({ content: `✅ Your TTS Provider is now: **${providerMap[provider] || provider}**` });
             } else {
                 if (!settings.servers[interaction.guild.id]) settings.servers[interaction.guild.id] = {};
                 if (typeof settings.servers[interaction.guild.id] === 'string') settings.servers[interaction.guild.id] = { voice: settings.servers[interaction.guild.id] };
                 settings.servers[interaction.guild.id].mode = provider;
-                const providerMap = { 'google': 'Google Translate', 'piper': 'Piper', 'espeak': 'eSpeak-ng', 'rhvoice': 'RHVoice', 'star': 'STAR (Distributed)' };
+                const providerMap = { 
+                    'google': 'Google Translate', 
+                    'google-cloud': 'Google Cloud (Official)', 
+                    'studio': 'Studio (Premium)', 
+                    'hd3': 'HD3 (Chirp)', 
+                    'piper': 'Piper', 
+                    'espeak': 'eSpeak-ng', 
+                    'rhvoice': 'RHVoice', 
+                    'star': 'STAR (Distributed)' 
+                };
                 await interaction.reply({ content: `✅ Server Default TTS Provider is now: **${providerMap[provider] || provider}**` });
             }
             fs.writeFileSync(ttsSettingsFile, JSON.stringify(settings, null, 2));

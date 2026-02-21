@@ -7,5 +7,8 @@ module.exports = {
     'fr-FR': { label: '🇫🇷 French', lang: 'fr', host: 'https://translate.google.com' },
     'ja-JP': { label: '🇯🇵 Japanese', lang: 'ja', host: 'https://translate.google.com' },
     'de-DE': { label: '🇩🇪 German', lang: 'de', host: 'https://translate.google.com' },
-    'pt-BR': { label: '🇧🇷 Portuguese (Brazil)', lang: 'pt', host: 'https://translate.google.com' }
+    'pt-BR': { label: '🇧🇷 Portuguese (Brazil)', lang: 'pt', host: 'https://translate.google.com' },
+    'studio': { label: '💎 Studio O', provider: 'studio' },
+    'sulafat': { label: '✨ HD3 Sulafat', provider: 'hd3', voiceKey: 'sulafat' },
+    'achernar': { label: '✨ HD3 Achernar', provider: 'hd3', voiceKey: 'achernar' }
 };

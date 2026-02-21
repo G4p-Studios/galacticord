@@ -6,6 +6,12 @@ const path = require('path');
 const fs = require('fs');
 const WebSocket = require('ws');
 const { Readable } = require('stream');
+const textToSpeech = require('@google-cloud/text-to-speech');
+
+// Initialize Google Cloud TTS Client with API Key from .env
+const gCloudClient = new textToSpeech.TextToSpeechClient({
+    apiKey: process.env.GEMINI_API_KEY
+});
 
 async function init() {} 
 function getEdgeVoices() { return []; }
@@ -106,6 +112,34 @@ async function getAudioStream(text, provider, voiceKey) {
             });
             const response = await axios.get(url, { responseType: 'stream' });
             return response.data;
+
+        } else if (cleanProvider === 'google-cloud') {
+            const request = {
+                input: { text: sanitizedText },
+                voice: { name: cleanVoiceKey || 'en-US-Neural2-A', languageCode: 'en-US' },
+                audioConfig: { audioEncoding: 'MP3', sampleRateHertz: 24000 },
+            };
+            const [response] = await gCloudClient.synthesizeSpeech(request);
+            return Readable.from(response.audioContent);
+
+        } else if (cleanProvider === 'studio') {
+            const request = {
+                input: { text: sanitizedText },
+                voice: { name: 'en-US-Studio-O', languageCode: 'en-US' },
+                audioConfig: { audioEncoding: 'MP3', sampleRateHertz: 24000 },
+            };
+            const [response] = await gCloudClient.synthesizeSpeech(request);
+            return Readable.from(response.audioContent);
+
+        } else if (cleanProvider === 'hd3') {
+            const voice = cleanVoiceKey === 'achernar' ? 'en-US-Chirp-HD-1.1-Achernar' : 'en-US-Chirp-HD-1.1-Sulafat';
+            const request = {
+                input: { text: sanitizedText },
+                voice: { name: voice, languageCode: 'en-US' },
+                audioConfig: { audioEncoding: 'MP3', sampleRateHertz: 24000 },
+            };
+            const [response] = await gCloudClient.synthesizeSpeech(request);
+            return Readable.from(response.audioContent);
 
         } else if (cleanProvider === 'piper') {
             const piperPath = resolvePath('piper');
