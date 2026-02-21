@@ -9,6 +9,12 @@ module.exports = {
     'de-DE': { label: '🇩🇪 German', lang: 'de', host: 'https://translate.google.com' },
     'pt-BR': { label: '🇧🇷 Portuguese (Brazil)', lang: 'pt', host: 'https://translate.google.com' },
     'studio': { label: '💎 Studio O', provider: 'studio' },
-    'sulafat': { label: '✨ HD3 Sulafat', provider: 'hd3', voiceKey: 'sulafat' },
-    'achernar': { label: '✨ HD3 Achernar', provider: 'hd3', voiceKey: 'achernar' }
+    'aoede': { label: '✨ Chirp3 Aoede', provider: 'hd3', voiceKey: 'aoede' },
+    'charon': { label: '✨ Chirp3 Charon', provider: 'hd3', voiceKey: 'charon' },
+    'fenrir': { label: '✨ Chirp3 Fenrir', provider: 'hd3', voiceKey: 'fenrir' },
+    'kore': { label: '✨ Chirp3 Kore', provider: 'hd3', voiceKey: 'kore' },
+    'leda': { label: '✨ Chirp3 Leda', provider: 'hd3', voiceKey: 'leda' },
+    'orus': { label: '✨ Chirp3 Orus', provider: 'hd3', voiceKey: 'orus' },
+    'puck': { label: '✨ Chirp3 Puck', provider: 'hd3', voiceKey: 'puck' },
+    'zephyr': { label: '✨ Chirp3 Zephyr', provider: 'hd3', voiceKey: 'zephyr' }
 };

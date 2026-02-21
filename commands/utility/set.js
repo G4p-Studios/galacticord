@@ -173,8 +173,14 @@ module.exports = {
             ];
         } else if (mode === 'hd3') {
             choices = [
-                { name: 'Sulafat (High Fidelity)', value: 'sulafat' },
-                { name: 'Achernar (High Fidelity)', value: 'achernar' }
+                { name: 'Aoede (Chirp3 HD)', value: 'aoede' },
+                { name: 'Charon (Chirp3 HD)', value: 'charon' },
+                { name: 'Fenrir (Chirp3 HD)', value: 'fenrir' },
+                { name: 'Kore (Chirp3 HD)', value: 'kore' },
+                { name: 'Leda (Chirp3 HD)', value: 'leda' },
+                { name: 'Orus (Chirp3 HD)', value: 'orus' },
+                { name: 'Puck (Chirp3 HD)', value: 'puck' },
+                { name: 'Zephyr (Chirp3 HD)', value: 'zephyr' }
             ];
         } else if (mode === 'piper') {
             const modelsDir = path.join(__dirname, '../../models');

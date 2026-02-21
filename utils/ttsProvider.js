@@ -101,6 +101,8 @@ async function getAudioStream(text, provider, voiceKey) {
     const cleanVoiceKey = ultimateClean(voiceKey);
     const sanitizedText = text.replace(/\s+/g, ' ').trim();
 
+    console.log(`[TTS Provider] Requesting stream. Provider: ${cleanProvider}, Voice: ${cleanVoiceKey}, Text: "${sanitizedText.substring(0, 50)}..."`);
+
     try {
         if (cleanProvider === 'google') {
             const voiceOptions = require('./voiceConstants');
@@ -114,31 +116,43 @@ async function getAudioStream(text, provider, voiceKey) {
             return response.data;
 
         } else if (cleanProvider === 'google-cloud') {
+            console.log(`[Google Cloud TTS] Synthesizing...`);
             const request = {
                 input: { text: sanitizedText },
                 voice: { name: cleanVoiceKey || 'en-US-Neural2-A', languageCode: 'en-US' },
                 audioConfig: { audioEncoding: 'MP3', sampleRateHertz: 24000 },
             };
             const [response] = await gCloudClient.synthesizeSpeech(request);
+            console.log(`[Google Cloud TTS] Synthesis successful. Audio size: ${response.audioContent.length} bytes`);
             return Readable.from(response.audioContent);
 
         } else if (cleanProvider === 'studio') {
+            console.log(`[Google Cloud Studio] Synthesizing...`);
             const request = {
                 input: { text: sanitizedText },
                 voice: { name: 'en-US-Studio-O', languageCode: 'en-US' },
                 audioConfig: { audioEncoding: 'MP3', sampleRateHertz: 24000 },
             };
             const [response] = await gCloudClient.synthesizeSpeech(request);
+            console.log(`[Google Cloud Studio] Synthesis successful. Audio size: ${response.audioContent.length} bytes`);
             return Readable.from(response.audioContent);
 
         } else if (cleanProvider === 'hd3') {
-            const voice = cleanVoiceKey === 'achernar' ? 'en-US-Chirp-HD-1.1-Achernar' : 'en-US-Chirp-HD-1.1-Sulafat';
+            // New Chirp3 HD voice names: Aoede, Charon, Fenrir, Kore, Leda, Orus, Puck, Zephyr
+            // Capitalize first letter of voiceKey if provided
+            const voiceName = cleanVoiceKey && cleanVoiceKey.length > 1 
+                ? cleanVoiceKey.charAt(0).toUpperCase() + cleanVoiceKey.slice(1).toLowerCase() 
+                : 'Zephyr';
+            const voice = `en-US-Chirp3-HD-${voiceName}`;
+            
+            console.log(`[Google Cloud HD3] Synthesizing with voice: ${voice}...`);
             const request = {
                 input: { text: sanitizedText },
                 voice: { name: voice, languageCode: 'en-US' },
                 audioConfig: { audioEncoding: 'MP3', sampleRateHertz: 24000 },
             };
             const [response] = await gCloudClient.synthesizeSpeech(request);
+            console.log(`[Google Cloud HD3] Synthesis successful. Audio size: ${response.audioContent.length} bytes`);
             return Readable.from(response.audioContent);
 
         } else if (cleanProvider === 'piper') {
@@ -223,9 +237,10 @@ async function getAudioStream(text, provider, voiceKey) {
 async function getAudioResource(text, provider, voiceKey) {
     try {
         const stream = await getAudioStream(text, provider, voiceKey);
+        console.log(`[AudioResource] Stream received, creating resource...`);
         return createAudioResource(stream, { inputType: StreamType.Arbitrary, inlineVolume: true });
     } catch (error) {
-        console.error(`[AudioResource] ${error.message}`);
+        console.error(`[AudioResource] Error: ${error.message}`);
         throw error;
     }
 }
