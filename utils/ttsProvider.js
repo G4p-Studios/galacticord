@@ -120,21 +120,21 @@ async function getAudioStream(text, provider, voiceKey) {
             
             let voice = cleanVoiceKey || 'en-US-Neural2-A';
             
-            // Allow legacy short names for Studio and HD3
+            // Handle legacy short names / fallback mappings
             if (voice === 'studio') voice = 'en-US-Studio-O';
             if (voice === 'sulafat') voice = 'en-US-Chirp3-HD-Sulafat';
             if (voice === 'achernar') voice = 'en-US-Chirp3-HD-Achernar';
-            if (['aoede', 'charon', 'fenrir', 'kore', 'leda', 'orus', 'puck', 'zephyr'].includes(voice.toLowerCase())) {
+            
+            const namedChirps = ['aoede', 'charon', 'fenrir', 'kore', 'leda', 'orus', 'puck', 'zephyr'];
+            if (namedChirps.includes(voice.toLowerCase())) {
                 voice = `en-US-Chirp3-HD-${voice.charAt(0).toUpperCase() + voice.slice(1).toLowerCase()}`;
             }
 
             // Dynamically determine language code (e.g. en-GB, en-AU, en-IN)
             let langCode = 'en-US';
-            if (voice.includes('-')) {
-                const parts = voice.split('-');
-                if (parts.length >= 2) {
-                    langCode = `${parts[0]}-${parts[1]}`;
-                }
+            const localeMatch = voice.match(/^([a-z]{2}-[A-Z]{2})/);
+            if (localeMatch) {
+                langCode = localeMatch[1];
             }
 
             console.log(`[Google Cloud TTS] Synthesizing with voice: ${voice} (${langCode})...`);
