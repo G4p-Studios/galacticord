@@ -14,6 +14,7 @@ module.exports = {
                 .setRequired(true)
                 .addChoices(
                     { name: 'Google Translate', value: 'google' },
+                    { name: 'Google Cloud (Official)', value: 'google-cloud' },
                     { name: 'Piper (High Quality)', value: 'piper' },
                     { name: 'eSpeak-ng (Classic Synth)', value: 'espeak' },
                     { name: 'RHVoice (Local Natural)', value: 'rhvoice' },
@@ -39,6 +40,13 @@ module.exports = {
                 name: value.label,
                 value: key
             }));
+        } else if (mode === 'google-cloud') {
+            choices = Object.entries(voiceOptions)
+                .filter(([key, value]) => value.gcloud)
+                .map(([key, value]) => ({
+                    name: value.label,
+                    value: key
+                }));
         } else if (mode === 'piper') {
             const modelsDir = path.join(__dirname, '../../models');
             if (fs.existsSync(modelsDir)) {
@@ -108,7 +116,16 @@ module.exports = {
         const text = interaction.options.getString('text');
 
         let finalVoice = voice;
-        if (mode === 'star') {
+        if (mode === 'google-cloud') {
+            // Apply legacy short-name mapping for consistency
+            if (voice === 'studio') finalVoice = 'en-US-Studio-O';
+            if (voice === 'sulafat') finalVoice = 'en-US-Chirp3-HD-Sulafat';
+            if (voice === 'achernar') finalVoice = 'en-US-Chirp3-HD-Achernar';
+            const namedChirps = ['aoede', 'charon', 'fenrir', 'kore', 'leda', 'orus', 'puck', 'zephyr'];
+            if (namedChirps.includes(voice.toLowerCase())) {
+                finalVoice = `en-US-Chirp3-HD-${voice.charAt(0).toUpperCase() + voice.slice(1).toLowerCase()}`;
+            }
+        } else if (mode === 'star') {
             // Load settings to get the URL
             let settings = { users: {}, servers: {} };
             try {
