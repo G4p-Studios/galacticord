@@ -44,7 +44,7 @@ module.exports = {
     'en-GB-Chirp-HD-A': { label: 'en-GB-Chirp-HD-A', gcloud: true },
     'en-GB-Chirp-HD-B': { label: 'en-GB-Chirp-HD-B', gcloud: true },
     'en-GB-Chirp-HD-C': { label: 'en-GB-Chirp-HD-C', gcloud: true },
-    'en-GB-Chirp-HD-D': { label: 'en-GB-Chirp-HD-D', gcloud: true },
+    'en-GB-Chirp-HD-D': { label: 'worrington nessa', gcloud: true },
     'en-GB-Chirp-HD-F': { label: 'en-GB-Chirp-HD-F', gcloud: true },
     'en-GB-Chirp3-HD-Aoede': { label: 'en-GB-Chirp3-HD-Aoede', gcloud: true },
     'en-GB-Chirp3-HD-Charon': { label: 'en-GB-Chirp3-HD-Charon', gcloud: true },
