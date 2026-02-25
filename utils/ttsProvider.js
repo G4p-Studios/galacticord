@@ -199,8 +199,21 @@ async function getAudioStream(text, provider, voiceKey) {
                 }
             });
 
+            // Safety Check: Ensure response has candidates and content
+            if (!result.response || !result.response.candidates || result.response.candidates.length === 0) {
+                console.error("[Gemini TTS] Empty response or no candidates:", JSON.stringify(result.response, null, 2));
+                throw new Error("Gemini TTS returned no audio candidates. (Possibly blocked by safety filters)");
+            }
+
+            const candidate = result.response.candidates[0];
+            if (!candidate.content || !candidate.content.parts) {
+                console.error("[Gemini TTS] Candidate missing content/parts. FinishReason:", candidate.finishReason);
+                console.error("Full Response:", JSON.stringify(result.response, null, 2));
+                throw new Error(`Gemini TTS failed to generate content. Reason: ${candidate.finishReason || 'Unknown'}`);
+            }
+
             // Extract audio part using the old bot's exact logic
-            const audioPart = result.response.candidates[0].content.parts.find(p => p.inlineData && p.inlineData.mimeType.startsWith("audio/"));
+            const audioPart = candidate.content.parts.find(p => p.inlineData && p.inlineData.mimeType.startsWith("audio/"));
             
             if (!audioPart || !audioPart.inlineData || !audioPart.inlineData.data) {
                 console.error("[Gemini TTS] No audio data in response:", JSON.stringify(result.response, null, 2));
