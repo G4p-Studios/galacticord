@@ -185,20 +185,10 @@ async function getAudioStream(text, provider, voiceKey) {
                 ? cleanVoiceKey.split('-')[1] 
                 : cleanVoiceKey;
 
-            // Handle legacy/friendly mappings for Gemini
-            const friendlyMap = {
-                'studio': 'Aoede',
-                'sulafat': 'Sulafat',
-                'achernar': 'Achernar'
-            };
-            if (friendlyMap[voiceName.toLowerCase()]) {
-                voiceName = friendlyMap[voiceName.toLowerCase()];
-            }
-
             const result = await geminiModel.generateContent({
                 contents: [{ role: 'user', parts: [{ text: sanitizedText }] }],
                 generationConfig: {
-                    responseModalities: ["audio"],
+                    responseModalities: ["AUDIO"],
                     speechConfig: {
                         voiceConfig: {
                             prebuiltVoiceConfig: {
@@ -209,8 +199,9 @@ async function getAudioStream(text, provider, voiceKey) {
                 }
             });
 
-            // The audio data is returned as an inlineData part in the first candidate
-            const audioPart = result.response.candidates[0].content.parts.find(p => p.inlineData);
+            // Extract audio part using the old bot's exact logic
+            const audioPart = result.response.candidates[0].content.parts.find(p => p.inlineData && p.inlineData.mimeType.startsWith("audio/"));
+            
             if (!audioPart || !audioPart.inlineData || !audioPart.inlineData.data) {
                 console.error("[Gemini TTS] No audio data in response:", JSON.stringify(result.response, null, 2));
                 throw new Error("Gemini TTS did not return audio data.");
