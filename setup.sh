@@ -16,13 +16,27 @@ read -p "Select an option [1-4]: " choice
 case $choice in
   1)
     echo ""
-    echo "[Step 1/3] Checking environment..."
-    if ! command -v node &> /dev/null; then
-        echo "Error: Node.js is not installed. Please install Node.js first."
-        exit 1
+    echo "[Step 1/5] Checking environment and installing system dependencies..."
+    
+    # Check for sudo
+    if [ "$EUID" -ne 0 ]; then 
+        echo "Please run as root or with sudo if you want to install system packages."
+        SUDO="sudo"
+    else
+        SUDO=""
     fi
-    if ! command -v git &> /dev/null; then
-        echo "Error: Git is not installed. Please install Git first."
+
+    # Install system packages (Debian/Ubuntu focused)
+    if command -v apt-get &> /dev/null; then
+        echo "Installing espeak-ng, ffmpeg, curl, and wget..."
+        $SUDO apt-get update -y
+        $SUDO apt-get install -y espeak-ng ffmpeg curl wget git
+    else
+        echo "Non-Debian/Ubuntu system detected. Please ensure espeak-ng, ffmpeg, and curl are installed manually."
+    fi
+
+    if ! command -v node &> /dev/null; then
+        echo "Error: Node.js is not installed. Please install Node.js (v18+) first."
         exit 1
     fi
 
@@ -36,11 +50,22 @@ case $choice in
     fi
 
     echo ""
-    echo "[Step 2/3] Installing dependencies..."
+    echo "[Step 2/5] Installing npm dependencies..."
     npm install
 
     echo ""
-    echo "[Step 3/3] Configuring .env file..."
+    echo "[Step 3/5] Setting up Piper voices..."
+    mkdir -p models
+    if [ ! -f "models/en_US-amy-medium.onnx" ]; then
+        echo "Downloading default Piper voice (Amy Medium)..."
+        wget -O models/en_US-amy-medium.onnx https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx
+        wget -O models/en_US-amy-medium.onnx.json https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx.json
+    else
+        echo "Default Piper voice already exists."
+    fi
+
+    echo ""
+    echo "[Step 4/5] Configuring .env file..."
     echo "Please enter your credentials below. Leave blank to skip optional ones."
     
     read -p "Discord Bot Token (Required): " DISCORD_TOKEN
@@ -58,8 +83,15 @@ GOOGLE_CLOUD_API_KEY=$GOOGLE_CLOUD_API_KEY
 YOUTUBE_API_KEY=$YOUTUBE_API_KEY
 OWNER_ID=$OWNER_ID
 EOF
+
     echo ""
-    echo "SUCCESS: Galacticord is installed and .env is configured."
+    echo "[Step 5/5] Finalizing setup..."
+    # Make other scripts executable if they exist
+    chmod +x *.sh 2>/dev/null
+
+    echo ""
+    echo "SUCCESS: Galacticord is installed and configured."
+    echo "You can now start the bot using option 2 or create a service with option 3."
     ;;
 
   2)
