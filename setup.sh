@@ -54,39 +54,58 @@ case $choice in
     npm install
 
     echo ""
-    echo "[Step 3/6] Setting up Piper and downloading voices..."
+    echo "[Step 3/6] Setting up local TTS engines (Piper, Linux voices)..."
     if [ -f "./piper.sh" ]; then
         chmod +x piper.sh
         ./piper.sh
-    else
-        echo "WARNING: piper.sh not found. Skipping Piper setup."
+    fi
+    if [ -f "./linuxspeech.sh" ]; then
+        chmod +x linuxspeech.sh
+        ./linuxspeech.sh
     fi
 
     echo ""
-    echo "[Step 4/6] Setting up eSpeak and fixing libraries..."
+    echo "[Step 4/6] Fixing libraries and common issues..."
     if [ -f "./fix_espeak.sh" ]; then
         chmod +x fix_espeak.sh
         ./fix_espeak.sh
     else
-        echo "WARNING: fix_espeak.sh not found. Skipping eSpeak setup."
+        echo "WARNING: fix_espeak.sh not found."
     fi
 
     echo ""
     echo "[Step 5/6] Configuring .env file..."
-    echo "Please enter your credentials below. Leave blank to skip optional ones."
+    echo "----------------------------------------------------"
+    echo "NOTE: If you already have tokens saved in .env, you can press ENTER"
+    echo "to leave a field blank and it will NOT modify that specific value."
+    echo "If you don't want to provide a certain credential (e.g. Gemini API Key),"
+    echo "just press ENTER."
+    echo "----------------------------------------------------"
     
-    # Check if .env exists and offer to backup
+    # Load existing values if .env exists
     if [ -f ".env" ]; then
         cp .env .env.bak
         echo "Existing .env backed up to .env.bak"
+        export $(grep -v '^#' .env | xargs)
     fi
 
-    read -p "Discord Bot Token (Required): " DISCORD_TOKEN
-    read -p "Discord Client ID (Required): " CLIENT_ID
-    read -p "Gemini API Key (Optional, for AI features): " GEMINI_API_KEY
-    read -p "Google Cloud API Key (Optional, for High Quality TTS): " GOOGLE_CLOUD_API_KEY
-    read -p "YouTube API Key (Optional, for Music Search): " YOUTUBE_API_KEY
-    read -p "Bot Owner ID (Optional): " OWNER_ID
+    read -p "Discord Bot Token (Current: ${DISCORD_TOKEN:-None}): " INPUT_TOKEN
+    DISCORD_TOKEN=${INPUT_TOKEN:-$DISCORD_TOKEN}
+
+    read -p "Discord Client ID (Current: ${CLIENT_ID:-None}): " INPUT_CLIENT_ID
+    CLIENT_ID=${INPUT_CLIENT_ID:-$CLIENT_ID}
+
+    read -p "Gemini API Key (Current: ${GEMINI_API_KEY:-None}): " INPUT_GEMINI
+    GEMINI_API_KEY=${INPUT_GEMINI:-$GEMINI_API_KEY}
+
+    read -p "Google Cloud API Key (Current: ${GOOGLE_CLOUD_API_KEY:-None}): " INPUT_GCLOUD
+    GOOGLE_CLOUD_API_KEY=${INPUT_GCLOUD:-$INPUT_GCLOUD}
+
+    read -p "YouTube API Key (Current: ${YOUTUBE_API_KEY:-None}): " INPUT_YOUTUBE
+    YOUTUBE_API_KEY=${INPUT_YOUTUBE:-$YOUTUBE_API_KEY}
+
+    read -p "Bot Owner ID (Current: ${OWNER_ID:-None}): " INPUT_OWNER
+    OWNER_ID=${INPUT_OWNER:-$OWNER_ID}
 
     cat <<EOF > .env
 DISCORD_TOKEN=$DISCORD_TOKEN
