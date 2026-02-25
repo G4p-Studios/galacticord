@@ -96,6 +96,21 @@ async function getStarAudioStream(text, url, voice) {
     });
 }
 
+/**
+ * Normalizes any audio stream to s16le stereo 48k PCM for Discord.
+ */
+function normalizeStream(stream) {
+    const ffmpeg = spawn('ffmpeg', [
+        '-i', 'pipe:0',
+        '-f', 's16le',
+        '-ar', '48000',
+        '-ac', '2',
+        'pipe:1'
+    ]);
+    stream.pipe(ffmpeg.stdin);
+    return ffmpeg.stdout;
+}
+
 async function getAudioStream(text, provider, voiceKey) {
     const cleanProvider = ultimateClean(provider).toLowerCase();
     const cleanVoiceKey = ultimateClean(voiceKey);
@@ -113,7 +128,7 @@ async function getAudioStream(text, provider, voiceKey) {
                 host: voiceConfig.host || 'https://translate.google.com',
             });
             const response = await axios.get(url, { responseType: 'stream' });
-            return response.data;
+            return normalizeStream(response.data);
 
         } else if (cleanProvider === 'google-cloud') {
             console.log(`[Google Cloud TTS] Provider: ${cleanProvider}, Voice: ${cleanVoiceKey}`);
@@ -130,22 +145,32 @@ async function getAudioStream(text, provider, voiceKey) {
                 voice = `en-US-Chirp3-HD-${voice.charAt(0).toUpperCase() + voice.slice(1).toLowerCase()}`;
             }
 
-            // Dynamically determine language code (e.g. en-GB, en-AU, en-IN)
+            // Dynamically determine language code
             let langCode = 'en-US';
             const localeMatch = voice.match(/^([a-z]{2}-[A-Z]{2})/);
-            if (localeMatch) {
-                langCode = localeMatch[1];
-            }
+            if (localeMatch) langCode = localeMatch[1];
 
-            console.log(`[Google Cloud TTS] Synthesizing with voice: ${voice} (${langCode})...`);
+            console.log(`[Google Cloud TTS] Synthesizing PCM with voice: ${voice} (${langCode})...`);
             const request = {
                 input: { text: sanitizedText },
                 voice: { name: voice, languageCode: langCode },
-                audioConfig: { audioEncoding: 'MP3', sampleRateHertz: 24000 },
+                audioConfig: { audioEncoding: 'LINEAR16', sampleRateHertz: 48000 },
             };
+            
             const [response] = await gCloudClient.synthesizeSpeech(request);
             console.log(`[Google Cloud TTS] Synthesis successful. Audio size: ${response.audioContent.length} bytes`);
-            return Readable.from(response.audioContent);
+
+            // For Buffer input, we spawn specifically
+            const ffmpeg = spawn('ffmpeg', [
+                '-i', 'pipe:0',
+                '-f', 's16le',
+                '-ar', '48000',
+                '-ac', '2',
+                'pipe:1'
+            ]);
+            ffmpeg.stdin.write(response.audioContent);
+            ffmpeg.stdin.end();
+            return ffmpeg.stdout;
 
         } else if (cleanProvider === 'piper') {
             const piperPath = resolvePath('piper');
@@ -157,66 +182,36 @@ async function getAudioStream(text, provider, voiceKey) {
                 piperProcess.stdin.write(sanitizedText + '\n');
                 piperProcess.stdin.end();
             }
-            return piperProcess.stdout;
+            return normalizeStream(piperProcess.stdout);
 
         } else if (cleanProvider === 'espeak') {
             const espeakPath = resolvePath('espeak-ng');
             const voice = cleanVoiceKey || 'en-us';
-            
-            // USE EXEC for maximum compatibility on restrictive systems
             const safeText = sanitizedText.replace(/"/g, '\"');
             const command = `printf "${safeText}" | "${espeakPath}" -v ${voice} --stdout`;
             
-            console.log(`[eSpeak] Executing: ${command}`);
-
-            return new Promise((resolve, reject) => {
-                const child = exec(command, { encoding: 'buffer', maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
-                    if (error) {
-                        console.error(`[eSpeak Error] ${error.message}`);
-                        return reject(error);
-                    }
-                    if (stderr && stderr.length > 0) {
-                        console.error(`[eSpeak Stderr] ${stderr.toString()}`);
-                    }
-                    resolve(Readable.from(stdout));
-                });
-            });
+            const child = exec(command, { encoding: 'buffer', maxBuffer: 10 * 1024 * 1024 });
+            return normalizeStream(child.stdout);
 
         } else if (cleanProvider === 'rhvoice') {
             const rhvoicePath = resolvePath('RHVoice-test');
             const voice = cleanVoiceKey || 'alan';
-            
             const safeText = sanitizedText.replace(/"/g, '\"');
             const command = `printf "${safeText}" | "${rhvoicePath}" -p ${voice} -o -`;
 
-            return new Promise((resolve, reject) => {
-                const child = exec(command, { encoding: 'buffer', maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
-                    if (error) {
-                        console.error(`[RHVoice Error] ${error.message}`);
-                        return reject(error);
-                    }
-                    resolve(Readable.from(stdout));
-                });
-            });
+            const child = exec(command, { encoding: 'buffer', maxBuffer: 10 * 1024 * 1024 });
+            return normalizeStream(child.stdout);
 
         } else if (cleanProvider === 'star') {
             let config = {};
-            try {
-                config = JSON.parse(voiceKey);
-            } catch (e) {
-                throw new Error("STAR configuration invalid. Please set URL with /set star_url");
-            }
-            
+            try { config = JSON.parse(voiceKey); } catch (e) { throw new Error("STAR configuration invalid."); }
             if (!config.url) throw new Error("No STAR URL configured.");
 
-            // Fallback for 'onnx' bug or empty voice
             let effectiveVoice = config.voice;
-            if (!effectiveVoice || effectiveVoice === 'onnx' || effectiveVoice === 'undefined') {
-                effectiveVoice = 'default';
-                console.log(`[STAR Debug] Invalid voice detected. Falling back to 'default'.`);
-            }
+            if (!effectiveVoice || effectiveVoice === 'onnx' || effectiveVoice === 'undefined') effectiveVoice = 'default';
 
-            return await getStarAudioStream(sanitizedText, config.url, effectiveVoice);
+            const starStream = await getStarAudioStream(sanitizedText, config.url, effectiveVoice);
+            return normalizeStream(starStream);
         }
 
         throw new Error("Unknown provider");
@@ -230,7 +225,7 @@ async function getAudioResource(text, provider, voiceKey) {
     try {
         const stream = await getAudioStream(text, provider, voiceKey);
         console.log(`[AudioResource] Stream received, creating resource...`);
-        return createAudioResource(stream, { inputType: StreamType.Arbitrary, inlineVolume: true });
+        return createAudioResource(stream, { inputType: StreamType.Raw, inlineVolume: true });
     } catch (error) {
         console.error(`[AudioResource] Error: ${error.message}`);
         throw error;
