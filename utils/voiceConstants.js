@@ -11,9 +11,6 @@ module.exports = {
     'pt-BR': { label: 'pt-BR (Google Translate)', lang: 'pt', host: 'https://translate.google.com' },
 
     // --- Google Cloud (Official) ---
-    // Labels now match official voice names for clarity.
-
-    // US English (en-US)
     'en-US-Studio-O': { label: 'en-US-Studio-O', gcloud: true },
     'en-US-Chirp3-HD-Aoede': { label: 'en-US-Chirp3-HD-Aoede', gcloud: true },
     'en-US-Chirp3-HD-Charon': { label: 'en-US-Chirp3-HD-Charon', gcloud: true },
@@ -38,7 +35,6 @@ module.exports = {
     'en-US-Wavenet-D': { label: 'en-US-Wavenet-D', gcloud: true },
     'en-US-Wavenet-F': { label: 'en-US-Wavenet-F', gcloud: true },
 
-    // British English (en-GB)
     'en-GB-Studio-B': { label: 'en-GB-Studio-B', gcloud: true },
     'en-GB-Studio-C': { label: 'en-GB-Studio-C', gcloud: true },
     'en-GB-Chirp-HD-A': { label: 'en-GB-Chirp-HD-A', gcloud: true },
@@ -46,14 +42,6 @@ module.exports = {
     'en-GB-Chirp-HD-C': { label: 'en-GB-Chirp-HD-C', gcloud: true },
     'en-GB-Chirp-HD-D': { label: 'worrington nessa', gcloud: true },
     'en-GB-Chirp-HD-F': { label: 'en-GB-Chirp-HD-F', gcloud: true },
-    'en-GB-Chirp3-HD-Aoede': { label: 'en-GB-Chirp3-HD-Aoede', gcloud: true },
-    'en-GB-Chirp3-HD-Charon': { label: 'en-GB-Chirp3-HD-Charon', gcloud: true },
-    'en-GB-Chirp3-HD-Fenrir': { label: 'en-GB-Chirp3-HD-Fenrir', gcloud: true },
-    'en-GB-Chirp3-HD-Kore': { label: 'en-GB-Chirp3-HD-Kore', gcloud: true },
-    'en-GB-Chirp3-HD-Leda': { label: 'en-GB-Chirp3-HD-Leda', gcloud: true },
-    'en-GB-Chirp3-HD-Orus': { label: 'en-GB-Chirp3-HD-Orus', gcloud: true },
-    'en-GB-Chirp3-HD-Puck': { label: 'en-GB-Chirp3-HD-Puck', gcloud: true },
-    'en-GB-Chirp3-HD-Zephyr': { label: 'en-GB-Chirp3-HD-Zephyr', gcloud: true },
     'en-GB-Neural2-A': { label: 'en-GB-Neural2-A', gcloud: true },
     'en-GB-Neural2-B': { label: 'en-GB-Neural2-B', gcloud: true },
     'en-GB-Neural2-C': { label: 'en-GB-Neural2-C', gcloud: true },
@@ -65,20 +53,6 @@ module.exports = {
     'en-GB-Wavenet-D': { label: 'en-GB-Wavenet-D', gcloud: true },
     'en-GB-Wavenet-F': { label: 'en-GB-Wavenet-F', gcloud: true },
 
-    // Australian English (en-AU)
-    'en-AU-Chirp-HD-A': { label: 'en-AU-Chirp-HD-A', gcloud: true },
-    'en-AU-Chirp-HD-B': { label: 'en-AU-Chirp-HD-B', gcloud: true },
-    'en-AU-Chirp-HD-C': { label: 'en-AU-Chirp-HD-C', gcloud: true },
-    'en-AU-Chirp-HD-D': { label: 'en-AU-Chirp-HD-D', gcloud: true },
-    'en-AU-Chirp-HD-F': { label: 'en-AU-Chirp-HD-F', gcloud: true },
-    'en-AU-Chirp3-HD-Aoede': { label: 'en-AU-Chirp3-HD-Aoede', gcloud: true },
-    'en-AU-Chirp3-HD-Charon': { label: 'en-AU-Chirp3-HD-Charon', gcloud: true },
-    'en-AU-Chirp3-HD-Fenrir': { label: 'en-AU-Chirp3-HD-Fenrir', gcloud: true },
-    'en-AU-Chirp3-HD-Kore': { label: 'en-AU-Chirp3-HD-Kore', gcloud: true },
-    'en-AU-Chirp3-HD-Leda': { label: 'en-AU-Chirp3-HD-Leda', gcloud: true },
-    'en-AU-Chirp3-HD-Orus': { label: 'en-AU-Chirp3-HD-Orus', gcloud: true },
-    'en-AU-Chirp3-HD-Puck': { label: 'en-AU-Chirp3-HD-Puck', gcloud: true },
-    'en-AU-Chirp3-HD-Zephyr': { label: 'en-AU-Chirp3-HD-Zephyr', gcloud: true },
     'en-AU-Neural2-A': { label: 'en-AU-Neural2-A', gcloud: true },
     'en-AU-Neural2-B': { label: 'en-AU-Neural2-B', gcloud: true },
     'en-AU-Neural2-C': { label: 'en-AU-Neural2-C', gcloud: true },
@@ -88,15 +62,6 @@ module.exports = {
     'en-AU-Wavenet-C': { label: 'en-AU-Wavenet-C', gcloud: true },
     'en-AU-Wavenet-D': { label: 'en-AU-Wavenet-D', gcloud: true },
 
-    // Indian English (en-IN)
-    'en-IN-Chirp3-HD-Aoede': { label: 'en-IN-Chirp3-HD-Aoede', gcloud: true },
-    'en-IN-Chirp3-HD-Charon': { label: 'en-IN-Chirp3-HD-Charon', gcloud: true },
-    'en-IN-Chirp3-HD-Fenrir': { label: 'en-IN-Chirp3-HD-Fenrir', gcloud: true },
-    'en-IN-Chirp3-HD-Kore': { label: 'en-IN-Chirp3-HD-Kore', gcloud: true },
-    'en-IN-Chirp3-HD-Leda': { label: 'en-IN-Chirp3-HD-Leda', gcloud: true },
-    'en-IN-Chirp3-HD-Orus': { label: 'en-IN-Chirp3-HD-Orus', gcloud: true },
-    'en-IN-Chirp3-HD-Puck': { label: 'en-IN-Chirp3-HD-Puck', gcloud: true },
-    'en-IN-Chirp3-HD-Zephyr': { label: 'en-IN-Chirp3-HD-Zephyr', gcloud: true },
     'en-IN-Neural2-A': { label: 'en-IN-Neural2-A', gcloud: true },
     'en-IN-Neural2-B': { label: 'en-IN-Neural2-B', gcloud: true },
     'en-IN-Neural2-C': { label: 'en-IN-Neural2-C', gcloud: true },
@@ -107,13 +72,16 @@ module.exports = {
     'en-IN-Wavenet-D': { label: 'en-IN-Wavenet-D', gcloud: true },
 
     // --- Gemini TTS (Preview) ---
-    // Using gemini-2.5-flash-preview-tts
-    'gemini-Aoede': { label: '♊ Gemini Aoede (Female)', gemini: true, voiceKey: 'Aoede' },
-    'gemini-Charon': { label: '♊ Gemini Charon (Male)', gemini: true, voiceKey: 'Charon' },
-    'gemini-Fenrir': { label: '♊ Gemini Fenrir (Male)', gemini: true, voiceKey: 'Fenrir' },
-    'gemini-Kore': { label: '♊ Gemini Kore (Female)', gemini: true, voiceKey: 'Kore' },
-    'gemini-Leda': { label: '♊ Gemini Leda (Female)', gemini: true, voiceKey: 'Leda' },
-    'gemini-Orus': { label: '♊ Gemini Orus (Male)', gemini: true, voiceKey: 'Orus' },
-    'gemini-Puck': { label: '♊ Gemini Puck (Male)', gemini: true, voiceKey: 'Puck' },
-    'gemini-Zephyr': { label: '♊ Gemini Zephyr (Female)', gemini: true, voiceKey: 'Zephyr' }
+    'gemini-Aoede': { label: '♊ Gemini Aoede', gemini: true, voiceKey: 'Aoede' },
+    'gemini-Puck': { label: '♊ Gemini Puck', gemini: true, voiceKey: 'Puck' },
+    'gemini-Zephyr': { label: '♊ Gemini Zephyr', gemini: true, voiceKey: 'Zephyr' },
+    'gemini-Charon': { label: '♊ Gemini Charon', gemini: true, voiceKey: 'Charon' },
+    'gemini-Fenrir': { label: '♊ Gemini Fenrir', gemini: true, voiceKey: 'Fenrir' },
+    'gemini-Kore': { label: '♊ Gemini Kore', gemini: true, voiceKey: 'Kore' },
+    'gemini-Leda': { label: '♊ Gemini Leda', gemini: true, voiceKey: 'Leda' },
+    'gemini-Orus': { label: '♊ Gemini Orus', gemini: true, voiceKey: 'Orus' },
+    'gemini-Achernar': { label: '♊ Gemini Achernar', gemini: true, voiceKey: 'Achernar' },
+    'gemini-Sulafat': { label: '♊ Gemini Sulafat', gemini: true, voiceKey: 'Sulafat' },
+    'gemini-Enceladus': { label: '♊ Gemini Enceladus', gemini: true, voiceKey: 'Enceladus' },
+    'gemini-Iapetus': { label: '♊ Gemini Iapetus', gemini: true, voiceKey: 'Iapetus' }
 };

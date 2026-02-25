@@ -180,21 +180,30 @@ async function getAudioStream(text, provider, voiceKey) {
         } else if (cleanProvider === 'gemini') {
             console.log(`[Gemini TTS] Synthesizing... Voice: ${cleanVoiceKey}`);
             
-            // Allow voiceKey to be just "Aoede" or "gemini-Aoede"
-            let voiceName = cleanVoiceKey.includes('-') ? cleanVoiceKey.split('-')[1] : cleanVoiceKey;
-            if (!['Aoede', 'Charon', 'Fenrir', 'Kore', 'Leda', 'Orus', 'puck', 'zephyr'].includes(voiceName)) {
-                voiceName = 'Aoede'; // Default
+            // Extract voice name from key (e.g. gemini-Aoede -> Aoede) or use as is
+            let voiceName = cleanVoiceKey.includes('-') && !cleanVoiceKey.startsWith('en-') 
+                ? cleanVoiceKey.split('-')[1] 
+                : cleanVoiceKey;
+
+            // Handle legacy/friendly mappings for Gemini
+            const friendlyMap = {
+                'studio': 'Aoede',
+                'sulafat': 'Sulafat',
+                'achernar': 'Achernar'
+            };
+            if (friendlyMap[voiceName.toLowerCase()]) {
+                voiceName = friendlyMap[voiceName.toLowerCase()];
             }
 
             const result = await geminiModel.generateContent({
-                contents: [{ parts: [{ text: sanitizedText }] }],
+                contents: [{ role: 'user', parts: [{ text: sanitizedText }] }],
                 generationConfig: {
-                    responseModalities: ["AUDIO"],
-                    speechConfig: {
-                        voiceConfig: {
-                            prebuiltVoiceConfig: {
-                                voiceName: voiceName
-                            }
+                    responseModalities: ["audio"]
+                },
+                speechConfig: {
+                    voiceConfig: {
+                        prebuiltVoiceConfig: {
+                            voiceName: voiceName
                         }
                     }
                 }
@@ -210,6 +219,7 @@ async function getAudioStream(text, provider, voiceKey) {
             const buffer = Buffer.from(audioPart.inlineData.data, 'base64');
             console.log(`[Gemini TTS] Success. Audio size: ${buffer.length} bytes`);
 
+            // Normalize to s16le stereo 48k via FFmpeg
             const ffmpeg = spawn('ffmpeg', [
                 '-i', 'pipe:0',
                 '-f', 's16le',
