@@ -198,12 +198,12 @@ async function getAudioStream(text, provider, voiceKey) {
             const result = await geminiModel.generateContent({
                 contents: [{ role: 'user', parts: [{ text: sanitizedText }] }],
                 generationConfig: {
-                    responseModalities: ["audio"]
-                },
-                speechConfig: {
-                    voiceConfig: {
-                        prebuiltVoiceConfig: {
-                            voiceName: voiceName
+                    responseModalities: ["audio"],
+                    speechConfig: {
+                        voiceConfig: {
+                            prebuiltVoiceConfig: {
+                                voiceName: voiceName
+                            }
                         }
                     }
                 }
