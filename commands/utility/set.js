@@ -50,6 +50,7 @@ module.exports = {
                         .addChoices(
                             { name: 'Google Translate (Simple, Fast)', value: 'google' },
                             { name: 'Google Cloud (Official - Neural, Studio, HD3)', value: 'google-cloud' },
+                            { name: 'Gemini TTS (Official - Flash 2.5)', value: 'gemini' },
                             { name: 'Piper (High Quality Local TTS)', value: 'piper' },
                             { name: 'eSpeak-ng (Classic Synth)', value: 'espeak' },
                             { name: 'RHVoice (Natural local voices)', value: 'rhvoice' },
@@ -154,6 +155,13 @@ module.exports = {
         } else if (mode === 'google-cloud') {
             choices = Object.entries(voiceOptions)
                 .filter(([key, value]) => value.gcloud)
+                .map(([key, value]) => ({
+                    name: value.label,
+                    value: key
+                }));
+        } else if (mode === 'gemini') {
+            choices = Object.entries(voiceOptions)
+                .filter(([key, value]) => value.gemini)
                 .map(([key, value]) => ({
                     name: value.label,
                     value: key
@@ -329,6 +337,7 @@ ${url}
                 const providerMap = { 
                     'google': 'Google Translate', 
                     'google-cloud': 'Google Cloud (Official)', 
+                    'gemini': 'Gemini TTS (Flash 2.5)',
                     'piper': 'Piper', 
                     'espeak': 'eSpeak-ng', 
                     'rhvoice': 'RHVoice', 
@@ -342,6 +351,7 @@ ${url}
                 const providerMap = { 
                     'google': 'Google Translate', 
                     'google-cloud': 'Google Cloud (Official)', 
+                    'gemini': 'Gemini TTS (Flash 2.5)',
                     'piper': 'Piper', 
                     'espeak': 'eSpeak-ng', 
                     'rhvoice': 'RHVoice', 

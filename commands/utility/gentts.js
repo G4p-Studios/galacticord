@@ -15,6 +15,7 @@ module.exports = {
                 .addChoices(
                     { name: 'Google Translate', value: 'google' },
                     { name: 'Google Cloud (Official)', value: 'google-cloud' },
+                    { name: 'Gemini TTS (Flash 2.5)', value: 'gemini' },
                     { name: 'Piper (High Quality)', value: 'piper' },
                     { name: 'eSpeak-ng (Classic Synth)', value: 'espeak' },
                     { name: 'RHVoice (Local Natural)', value: 'rhvoice' },
@@ -44,6 +45,13 @@ module.exports = {
             } else if (mode === 'google-cloud') {
                 choices = Object.entries(voiceOptions)
                     .filter(([key, value]) => value.gcloud)
+                    .map(([key, value]) => ({
+                        name: value.label,
+                        value: key
+                    }));
+            } else if (mode === 'gemini') {
+                choices = Object.entries(voiceOptions)
+                    .filter(([key, value]) => value.gemini)
                     .map(([key, value]) => ({
                         name: value.label,
                         value: key
@@ -131,6 +139,11 @@ module.exports = {
             const namedChirps = ['aoede', 'charon', 'fenrir', 'kore', 'leda', 'orus', 'puck', 'zephyr'];
             if (namedChirps.includes(voice.toLowerCase())) {
                 finalVoice = `en-US-Chirp3-HD-${voice.charAt(0).toUpperCase() + voice.slice(1).toLowerCase()}`;
+            }
+        } else if (mode === 'gemini') {
+            const namedGemini = ['aoede', 'charon', 'fenrir', 'kore', 'leda', 'orus', 'puck', 'zephyr'];
+            if (namedGemini.includes(voice.toLowerCase())) {
+                finalVoice = `gemini-${voice.charAt(0).toUpperCase() + voice.slice(1).toLowerCase()}`;
             }
         } else if (mode === 'star') {
             let settings = { users: {}, servers: {} };

@@ -104,5 +104,16 @@ module.exports = {
     'en-IN-Wavenet-A': { label: 'en-IN-Wavenet-A', gcloud: true },
     'en-IN-Wavenet-B': { label: 'en-IN-Wavenet-B', gcloud: true },
     'en-IN-Wavenet-C': { label: 'en-IN-Wavenet-C', gcloud: true },
-    'en-IN-Wavenet-D': { label: 'en-IN-Wavenet-D', gcloud: true }
+    'en-IN-Wavenet-D': { label: 'en-IN-Wavenet-D', gcloud: true },
+
+    // --- Gemini TTS (Preview) ---
+    // Using gemini-2.5-flash-preview-tts
+    'gemini-Aoede': { label: '♊ Gemini Aoede (Female)', gemini: true, voiceKey: 'Aoede' },
+    'gemini-Charon': { label: '♊ Gemini Charon (Male)', gemini: true, voiceKey: 'Charon' },
+    'gemini-Fenrir': { label: '♊ Gemini Fenrir (Male)', gemini: true, voiceKey: 'Fenrir' },
+    'gemini-Kore': { label: '♊ Gemini Kore (Female)', gemini: true, voiceKey: 'Kore' },
+    'gemini-Leda': { label: '♊ Gemini Leda (Female)', gemini: true, voiceKey: 'Leda' },
+    'gemini-Orus': { label: '♊ Gemini Orus (Male)', gemini: true, voiceKey: 'Orus' },
+    'gemini-Puck': { label: '♊ Gemini Puck (Male)', gemini: true, voiceKey: 'Puck' },
+    'gemini-Zephyr': { label: '♊ Gemini Zephyr (Female)', gemini: true, voiceKey: 'Zephyr' }
 };

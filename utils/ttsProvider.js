@@ -7,11 +7,16 @@ const fs = require('fs');
 const WebSocket = require('ws');
 const { Readable } = require('stream');
 const textToSpeech = require('@google-cloud/text-to-speech');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // Initialize Google Cloud TTS Client with API Key from .env
 const gCloudClient = new textToSpeech.TextToSpeechClient({
     apiKey: process.env.GOOGLE_CLOUD_API_KEY
 });
+
+// Initialize Gemini AI for TTS
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-tts" });
 
 async function init() {} 
 function getEdgeVoices() { return []; }
@@ -169,6 +174,46 @@ async function getAudioStream(text, provider, voiceKey) {
                 'pipe:1'
             ]);
             ffmpeg.stdin.write(response.audioContent);
+            ffmpeg.stdin.end();
+            return ffmpeg.stdout;
+
+        } else if (cleanProvider === 'gemini') {
+            console.log(`[Gemini TTS] Synthesizing... Voice: ${cleanVoiceKey}`);
+            
+            // Allow voiceKey to be just "Aoede" or "gemini-Aoede"
+            let voiceName = cleanVoiceKey.includes('-') ? cleanVoiceKey.split('-')[1] : cleanVoiceKey;
+            if (!['Aoede', 'Charon', 'Fenrir', 'Kore', 'Leda', 'Orus', 'Puck', 'Zephyr'].includes(voiceName)) {
+                voiceName = 'Aoede'; // Default
+            }
+
+            const result = await geminiModel.generateContent({
+                contents: [{ parts: [{ text: sanitizedText }] }],
+                generationConfig: {
+                    responseMimeType: "audio/wav",
+                    speechConfig: {
+                        voiceConfig: {
+                            prebuiltVoiceConfig: {
+                                voiceName: voiceName
+                            }
+                        }
+                    }
+                }
+            });
+
+            const audioPart = result.response.candidates[0].content.parts.find(p => p.inlineData);
+            if (!audioPart) throw new Error("Gemini TTS did not return audio data.");
+
+            const buffer = Buffer.from(audioPart.inlineData.data, 'base64');
+            console.log(`[Gemini TTS] Success. Audio size: ${buffer.length} bytes`);
+
+            const ffmpeg = spawn('ffmpeg', [
+                '-i', 'pipe:0',
+                '-f', 's16le',
+                '-ar', '48000',
+                '-ac', '2',
+                'pipe:1'
+            ]);
+            ffmpeg.stdin.write(buffer);
             ffmpeg.stdin.end();
             return ffmpeg.stdout;
 
