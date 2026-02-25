@@ -182,14 +182,14 @@ async function getAudioStream(text, provider, voiceKey) {
             
             // Allow voiceKey to be just "Aoede" or "gemini-Aoede"
             let voiceName = cleanVoiceKey.includes('-') ? cleanVoiceKey.split('-')[1] : cleanVoiceKey;
-            if (!['Aoede', 'Charon', 'Fenrir', 'Kore', 'Leda', 'Orus', 'Puck', 'Zephyr'].includes(voiceName)) {
+            if (!['Aoede', 'Charon', 'Fenrir', 'Kore', 'Leda', 'Orus', 'puck', 'zephyr'].includes(voiceName)) {
                 voiceName = 'Aoede'; // Default
             }
 
             const result = await geminiModel.generateContent({
                 contents: [{ parts: [{ text: sanitizedText }] }],
                 generationConfig: {
-                    responseMimeType: "audio/wav",
+                    responseModalities: ["AUDIO"],
                     speechConfig: {
                         voiceConfig: {
                             prebuiltVoiceConfig: {
@@ -200,8 +200,12 @@ async function getAudioStream(text, provider, voiceKey) {
                 }
             });
 
+            // The audio data is returned as an inlineData part in the first candidate
             const audioPart = result.response.candidates[0].content.parts.find(p => p.inlineData);
-            if (!audioPart) throw new Error("Gemini TTS did not return audio data.");
+            if (!audioPart || !audioPart.inlineData || !audioPart.inlineData.data) {
+                console.error("[Gemini TTS] No audio data in response:", JSON.stringify(result.response, null, 2));
+                throw new Error("Gemini TTS did not return audio data.");
+            }
 
             const buffer = Buffer.from(audioPart.inlineData.data, 'base64');
             console.log(`[Gemini TTS] Success. Audio size: ${buffer.length} bytes`);
