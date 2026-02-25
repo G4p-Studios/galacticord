@@ -207,17 +207,32 @@ async function getAudioStream(text, provider, voiceKey) {
                 throw new Error("Gemini TTS did not return audio data.");
             }
 
+            console.log(`[Gemini TTS] Received MIME Type: ${audioPart.inlineData.mimeType}`);
             const buffer = Buffer.from(audioPart.inlineData.data, 'base64');
             console.log(`[Gemini TTS] Success. Audio size: ${buffer.length} bytes`);
 
             // Normalize to s16le stereo 48k via FFmpeg
+            // If the mimeType is raw audio (e.g. audio/pcm or similar), we MUST specify input format
+            const inputArgs = (audioPart.inlineData.mimeType.includes('pcm') || audioPart.inlineData.mimeType === 'audio/l16') 
+                ? ['-f', 's16le', '-ar', '24000', '-ac', '1'] 
+                : [];
+
             const ffmpeg = spawn('ffmpeg', [
+                ...inputArgs,
                 '-i', 'pipe:0',
                 '-f', 's16le',
                 '-ar', '48000',
                 '-ac', '2',
                 'pipe:1'
             ]);
+
+            ffmpeg.stderr.on('data', (data) => {
+                const msg = data.toString();
+                if (msg.includes('Error') || msg.includes('Invalid')) {
+                    console.error(`[Gemini FFmpeg Debug] ${msg}`);
+                }
+            });
+
             ffmpeg.stdin.write(buffer);
             ffmpeg.stdin.end();
             return ffmpeg.stdout;
