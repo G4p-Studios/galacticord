@@ -6,7 +6,7 @@
 echo "===================================================="
 echo "    GALACTICORD DISCORD BOT - MANAGEMENT SCRIPT    "
 echo "===================================================="
-echo "1) Install / Setup (Fresh Install & .env config)"
+echo "1) Install / Setup (Full Installation & .env config)"
 echo "2) Start Bot (Standard npm start)"
 echo "3) Create Systemd Service (Auto-restart on boot)"
 echo "4) Exit"
@@ -16,7 +16,7 @@ read -p "Select an option [1-4]: " choice
 case $choice in
   1)
     echo ""
-    echo "[Step 1/5] Checking environment and installing system dependencies..."
+    echo "[Step 1/6] Checking environment and installing system dependencies..."
     
     # Check for sudo
     if [ "$EUID" -ne 0 ]; then 
@@ -28,11 +28,11 @@ case $choice in
 
     # Install system packages (Debian/Ubuntu focused)
     if command -v apt-get &> /dev/null; then
-        echo "Installing espeak-ng, ffmpeg, curl, and wget..."
+        echo "Installing core dependencies: ffmpeg, curl, wget, git..."
         $SUDO apt-get update -y
-        $SUDO apt-get install -y espeak-ng ffmpeg curl wget git
+        $SUDO apt-get install -y ffmpeg curl wget git
     else
-        echo "Non-Debian/Ubuntu system detected. Please ensure espeak-ng, ffmpeg, and curl are installed manually."
+        echo "Non-Debian/Ubuntu system detected. Please ensure ffmpeg, curl, and wget are installed manually."
     fi
 
     if ! command -v node &> /dev/null; then
@@ -40,7 +40,7 @@ case $choice in
         exit 1
     fi
 
-    # If the current directory is empty or not a git repo, offer to clone
+    # If the current directory is not a git repo, offer to clone
     if [ ! -d ".git" ]; then
         echo "Current directory is not a Galacticord repository."
         read -p "Would you like to clone Galacticord here? [y/n]: " clone_choice
@@ -50,24 +50,37 @@ case $choice in
     fi
 
     echo ""
-    echo "[Step 2/5] Installing npm dependencies..."
+    echo "[Step 2/6] Running npm install..."
     npm install
 
     echo ""
-    echo "[Step 3/5] Setting up Piper voices..."
-    mkdir -p models
-    if [ ! -f "models/en_US-amy-medium.onnx" ]; then
-        echo "Downloading default Piper voice (Amy Medium)..."
-        wget -O models/en_US-amy-medium.onnx https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx
-        wget -O models/en_US-amy-medium.onnx.json https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx.json
+    echo "[Step 3/6] Setting up Piper and downloading voices..."
+    if [ -f "./piper.sh" ]; then
+        chmod +x piper.sh
+        ./piper.sh
     else
-        echo "Default Piper voice already exists."
+        echo "WARNING: piper.sh not found. Skipping Piper setup."
     fi
 
     echo ""
-    echo "[Step 4/5] Configuring .env file..."
+    echo "[Step 4/6] Setting up eSpeak and fixing libraries..."
+    if [ -f "./fix_espeak.sh" ]; then
+        chmod +x fix_espeak.sh
+        ./fix_espeak.sh
+    else
+        echo "WARNING: fix_espeak.sh not found. Skipping eSpeak setup."
+    fi
+
+    echo ""
+    echo "[Step 5/6] Configuring .env file..."
     echo "Please enter your credentials below. Leave blank to skip optional ones."
     
+    # Check if .env exists and offer to backup
+    if [ -f ".env" ]; then
+        cp .env .env.bak
+        echo "Existing .env backed up to .env.bak"
+    fi
+
     read -p "Discord Bot Token (Required): " DISCORD_TOKEN
     read -p "Discord Client ID (Required): " CLIENT_ID
     read -p "Gemini API Key (Optional, for AI features): " GEMINI_API_KEY
@@ -85,12 +98,12 @@ OWNER_ID=$OWNER_ID
 EOF
 
     echo ""
-    echo "[Step 5/5] Finalizing setup..."
-    # Make other scripts executable if they exist
+    echo "[Step 6/6] Finalizing setup..."
+    # Ensure all scripts are executable
     chmod +x *.sh 2>/dev/null
 
     echo ""
-    echo "SUCCESS: Galacticord is installed and configured."
+    echo "SUCCESS: Galacticord is fully installed and configured!"
     echo "You can now start the bot using option 2 or create a service with option 3."
     ;;
 
