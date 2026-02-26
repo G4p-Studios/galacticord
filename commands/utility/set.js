@@ -254,7 +254,7 @@ module.exports = {
                 'modLog': 'Moderation Log',
                 'ttsChannel': 'TTS Channel'
             };
-            await interaction.reply({ content: `✅ ${typeNames[type] || type} has been set to ${channel}.` });
+            await interaction.reply({ content: `${typeNames[type] || type} has been set to ${channel}.` });
 
         } else if (subcommand === 'bot') {
             if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
@@ -281,16 +281,16 @@ module.exports = {
                 if (!settings.users[interaction.user.id]) settings.users[interaction.user.id] = {};
                 settings.users[interaction.user.id].starUrl = url;
                 settings.users[interaction.user.id].mode = 'star';
-                await interaction.reply({ content: `✅ Your STAR URL has been set to: 
+                await interaction.reply({ content: `Your STAR URL has been set to: 
 ${url}
-✅ Provider switched to STAR.` });
+Provider switched to STAR.` });
             } else {
                 if (!settings.servers[interaction.guild.id]) settings.servers[interaction.guild.id] = {};
                 settings.servers[interaction.guild.id].starUrl = url;
                 settings.servers[interaction.guild.id].mode = 'star';
-                await interaction.reply({ content: `✅ Server Default STAR URL has been set to: 
+                await interaction.reply({ content: `Server Default STAR URL has been set to: 
 ${url}
-✅ Server Default Provider switched to STAR.` });
+Server Default Provider switched to STAR.` });
             }
             fs.writeFileSync(ttsSettingsFile, JSON.stringify(settings, null, 2));
 
@@ -313,11 +313,11 @@ ${url}
             if (target === 'user') {
                 if (!settings.users[interaction.user.id]) settings.users[interaction.user.id] = {};
                 settings.users[interaction.user.id].musicProxy = url;
-                await interaction.reply({ content: `✅ Your Music Proxy has been set to: \`${url}\`` });
+                await interaction.reply({ content: `Your Music Proxy has been set to: \`${url}\`` });
             } else {
                 if (!settings.servers[interaction.guild.id]) settings.servers[interaction.guild.id] = {};
                 settings.servers[interaction.guild.id].musicProxy = url;
-                await interaction.reply({ content: `✅ Server Default Music Proxy has been set to: \`${url}\`` });
+                await interaction.reply({ content: `Server Default Music Proxy has been set to: \`${url}\`` });
             }
 
             fs.writeFileSync(ttsSettingsFile, JSON.stringify(settings, null, 2));
@@ -343,7 +343,7 @@ ${url}
                     'rhvoice': 'RHVoice', 
                     'star': 'STAR (Distributed)' 
                 };
-                await interaction.reply({ content: `✅ Your TTS Provider is now: ${providerMap[provider] || provider}` });
+                await interaction.reply({ content: `Your TTS Provider is now: ${providerMap[provider] || provider}` });
             } else {
                 if (!settings.servers[interaction.guild.id]) settings.servers[interaction.guild.id] = {};
                 if (typeof settings.servers[interaction.guild.id] === 'string') settings.servers[interaction.guild.id] = { voice: settings.servers[interaction.guild.id] };
@@ -357,7 +357,7 @@ ${url}
                     'rhvoice': 'RHVoice', 
                     'star': 'STAR (Distributed)' 
                 };
-                await interaction.reply({ content: `✅ Server Default TTS Provider is now: ${providerMap[provider] || provider}` });
+                await interaction.reply({ content: `Server Default TTS Provider is now: ${providerMap[provider] || provider}` });
             }
             fs.writeFileSync(ttsSettingsFile, JSON.stringify(settings, null, 2));
 
@@ -383,12 +383,12 @@ ${url}
                 if (!settings.users[interaction.user.id]) settings.users[interaction.user.id] = {};
                 if (typeof settings.users[interaction.user.id] === 'string') settings.users[interaction.user.id] = { voice: settings.users[interaction.user.id] };
                 settings.users[interaction.user.id].voice = selectedVoiceKey;
-                await interaction.reply({ content: `✅ Your personal TTS voice has been set to ${voiceName}.` });
+                await interaction.reply({ content: `Your personal TTS voice has been set to ${voiceName}.` });
             } else {
                 if (!settings.servers[interaction.guild.id]) settings.servers[interaction.guild.id] = {};
                 if (typeof settings.servers[interaction.guild.id] === 'string') settings.servers[interaction.guild.id] = { voice: settings.servers[interaction.guild.id] };
                 settings.servers[interaction.guild.id].voice = selectedVoiceKey;
-                await interaction.reply({ content: `✅ Server default TTS voice has been set to ${voiceName}.` });
+                await interaction.reply({ content: `Server default TTS voice has been set to ${voiceName}.` });
             }
             fs.writeFileSync(ttsSettingsFile, JSON.stringify(settings, null, 2));
         }
