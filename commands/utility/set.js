@@ -369,16 +369,26 @@ ${url}
             }
             let settings = { users: {}, servers: {} };
             try { if (fs.existsSync(ttsSettingsFile)) settings = JSON.parse(fs.readFileSync(ttsSettingsFile, 'utf8')); } catch (e) {}
+
+            // Try to find a pretty label for the voice
+            let voiceName = selectedVoiceKey;
+            if (voiceOptions[selectedVoiceKey]) {
+                voiceName = voiceOptions[selectedVoiceKey].label;
+            } else if (selectedVoiceKey.startsWith('models/')) {
+                // Piper model path cleanup for display
+                voiceName = selectedVoiceKey.split('/').pop().replace('.onnx', '');
+            }
+
             if (target === 'user') {
                 if (!settings.users[interaction.user.id]) settings.users[interaction.user.id] = {};
                 if (typeof settings.users[interaction.user.id] === 'string') settings.users[interaction.user.id] = { voice: settings.users[interaction.user.id] };
                 settings.users[interaction.user.id].voice = selectedVoiceKey;
-                await interaction.reply({ content: `✅ Your personal TTS voice has been set.` });
+                await interaction.reply({ content: `✅ Your personal TTS voice has been set to **${voiceName}**.` });
             } else {
                 if (!settings.servers[interaction.guild.id]) settings.servers[interaction.guild.id] = {};
                 if (typeof settings.servers[interaction.guild.id] === 'string') settings.servers[interaction.guild.id] = { voice: settings.servers[interaction.guild.id] };
                 settings.servers[interaction.guild.id].voice = selectedVoiceKey;
-                await interaction.reply({ content: `✅ Server default TTS voice has been set.` });
+                await interaction.reply({ content: `✅ Server default TTS voice has been set to **${voiceName}**.` });
             }
             fs.writeFileSync(ttsSettingsFile, JSON.stringify(settings, null, 2));
         }
