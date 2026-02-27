@@ -47,6 +47,6 @@ npm start
 - `/describe [image_attachment]`: AI image description.
 - `/addyoutube <channel_id> <target_channel>`: Add a YouTube feed (ID must start with 'UC').
 
-## Notes
-- **Music** requires FFmpeg to be installed and in your PATH.
-- **TTS** works by joining the voice channel of the user who sent the message in the TTS channel.
+## License
+
+This project is open-source and licensed under the GNU General Public License v3. See the `LICENSE` file for details.
