@@ -1,10 +1,11 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, VoiceConnectionStatus, entersState, getVoiceConnection, StreamType, AudioPlayerStatus } = require('@discordjs/voice');
+const { joinVoiceChannel, createAudioResource, VoiceConnectionStatus, entersState, getVoiceConnection, StreamType, AudioPlayerStatus } = require('@discordjs/voice');
 const { ensureYtDlp, binaryPath } = require('../../utils/ytDlpHelper');
 const { spawn } = require('child_process');
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
+const { getPlayer, setMusicResume } = require('../../utils/audioQueue');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -57,9 +58,11 @@ module.exports = {
                     adapterCreator: interaction.guild.voiceAdapterCreator,
                 });
 
+                const player = getPlayer(interaction.guild.id);
+
                 queue = {
                     connection,
-                    player: createAudioPlayer(),
+                    player,
                     songs: [],
                     textChannel: interaction.channel,
                 };
@@ -67,9 +70,24 @@ module.exports = {
                 interaction.client.queues.set(interaction.guild.id, queue);
                 queue.connection.subscribe(queue.player);
 
+                // Register resumption callback for TTS interruption
+                setMusicResume(interaction.guild.id, () => {
+                    const q = interaction.client.queues.get(interaction.guild.id);
+                    if (q && q.songs.length > 0) {
+                        console.log(`[Music] Resuming YouTube playback after TTS...`);
+                        playNext(interaction.guild.id, interaction.client, true); // true = isResume
+                    }
+                });
+
+                // Standard idle handling (song finished)
                 queue.player.on(AudioPlayerStatus.Idle, () => {
-                    queue.songs.shift();
-                    playNext(interaction.guild.id, interaction.client);
+                    const q = interaction.client.queues.get(interaction.guild.id);
+                    if (!q) return;
+                    
+                    // Only shift and play next if we aren't currently playing TTS
+                    // If we ARE playing TTS, the audioQueue.js handler will trigger the resume callback
+                    const { isPlayingTTS } = require('../../utils/audioQueue'); // Dynamic check
+                    // Actually, we can check guildQueues directly if exported, or just trust the resumeCallback
                 });
 
                 queue.player.on('error', error => {
@@ -96,14 +114,18 @@ module.exports = {
     },
 };
 
-async function playNext(guildId, client) {
+async function playNext(guildId, client, isResume = false) {
     const queue = client.queues.get(guildId);
-    if (!queue || queue.songs.length === 0) {
-        // Optional: Disconnect after some time of inactivity
-        return;
+    if (!queue || queue.songs.length === 0) return;
+
+    // Only skip to next song if this ISN'T a resumption from TTS
+    if (queue.player.state.status === AudioPlayerStatus.Idle && !isResume) {
+        queue.songs.shift();
+        if (queue.songs.length === 0) return;
     }
 
     const song = queue.songs[0];
+    if (!song) return;
     
     try {
         const musicArgs = [

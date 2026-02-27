@@ -71,6 +71,7 @@ function initGuildData(guildId) {
             player, 
             queue: [], 
             backgroundUrl: null,
+            resumeCallback: null,
             isPlayingTTS: false 
         };
         guildQueues.set(guildId, guildData);
@@ -88,7 +89,11 @@ function initGuildData(guildId) {
             } else {
                 // No more TTS. Resume background if available.
                 currentData.isPlayingTTS = false;
-                if (currentData.backgroundUrl) {
+                
+                if (currentData.resumeCallback) {
+                    console.log(`[AudioQueue] Executing resume callback for music.`);
+                    currentData.resumeCallback();
+                } else if (currentData.backgroundUrl) {
                     const now = Date.now();
                     const lastTime = lastRestart.get(guildId) || 0;
                     
@@ -156,4 +161,14 @@ function addToQueue(guildId, resource, connection) {
     }
 }
 
-module.exports = { addToQueue, setBackground, stopBackground };
+function setMusicResume(guildId, callback) {
+    const guildData = initGuildData(guildId);
+    guildData.resumeCallback = callback;
+}
+
+function getPlayer(guildId) {
+    const guildData = initGuildData(guildId);
+    return guildData.player;
+}
+
+module.exports = { addToQueue, setBackground, stopBackground, setMusicResume, getPlayer };
