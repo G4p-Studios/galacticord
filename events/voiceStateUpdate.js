@@ -27,32 +27,58 @@ module.exports = {
 
         if (!wasInChannel && !isInChannel) return;
 
+        // Load Server Config for Toggles
+        let config = {};
+        try {
+            if (fs.existsSync(configFile)) {
+                config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+            }
+        } catch (e) {}
+
+        const eventToggles = config[guildId]?.voiceEvents || {
+            joinLeave: true,
+            mute: true,
+            deafen: true,
+            streaming: true
+        };
+
         let textToSpeak = "";
         const displayName = newState.member.displayName;
 
         // 1. Join/Leave/Switch Logic
-        if (!wasInChannel && isInChannel) {
-            textToSpeak = `${displayName} has joined the channel.`;
-        } else if (wasInChannel && !isInChannel) {
-            textToSpeak = `${displayName} has left the channel.`;
-        } 
-        // 2. Mute/Unmute Logic (Only if they are in the channel)
-        else if (isInChannel && oldState.selfMute !== newState.selfMute) {
-            textToSpeak = `${displayName} is now ${newState.selfMute ? "muted" : "unmuted"}.`;
+        if (eventToggles.joinLeave) {
+            if (!wasInChannel && isInChannel) {
+                textToSpeak = `${displayName} has joined the channel.`;
+            } else if (wasInChannel && !isInChannel) {
+                textToSpeak = `${displayName} has left the channel.`;
+            }
         }
-        else if (isInChannel && oldState.serverMute !== newState.serverMute) {
-            textToSpeak = `${displayName} was ${newState.serverMute ? "server muted" : "server unmuted"}.`;
+
+        // 2. Mute/Unmute Logic
+        if (!textToSpeak && eventToggles.mute && isInChannel) {
+            if (oldState.selfMute !== newState.selfMute) {
+                textToSpeak = `${displayName} is now ${newState.selfMute ? "muted" : "unmuted"}.`;
+            }
+            else if (oldState.serverMute !== newState.serverMute) {
+                textToSpeak = `${displayName} was ${newState.serverMute ? "server muted" : "server unmuted"}.`;
+            }
         }
+
         // 3. Deafen/Undeafen Logic
-        else if (isInChannel && oldState.selfDeaf !== newState.selfDeaf) {
-            textToSpeak = `${displayName} is now ${newState.selfDeaf ? "deafened" : "undeafened"}.`;
+        if (!textToSpeak && eventToggles.deafen && isInChannel) {
+            if (oldState.selfDeaf !== newState.selfDeaf) {
+                textToSpeak = `${displayName} is now ${newState.selfDeaf ? "deafened" : "undeafened"}.`;
+            }
+            else if (oldState.serverDeaf !== newState.serverDeaf) {
+                textToSpeak = `${displayName} was ${newState.serverDeaf ? "server deafened" : "server undeafened"}.`;
+            }
         }
-        else if (isInChannel && oldState.serverDeaf !== newState.serverDeaf) {
-            textToSpeak = `${displayName} was ${newState.serverDeaf ? "server deafened" : "server undeafened"}.`;
-        }
+
         // 4. Streaming Logic
-        else if (isInChannel && oldState.streaming !== newState.streaming) {
-            textToSpeak = `${displayName} ${newState.streaming ? "started streaming" : "stopped streaming"}.`;
+        if (!textToSpeak && eventToggles.streaming && isInChannel) {
+            if (oldState.streaming !== newState.streaming) {
+                textToSpeak = `${displayName} ${newState.streaming ? "started streaming" : "stopped streaming"}.`;
+            }
         }
 
         if (!textToSpeak) return;
