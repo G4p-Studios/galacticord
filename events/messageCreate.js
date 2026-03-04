@@ -129,6 +129,7 @@ module.exports = {
                         channelId: targetChannel.id,
                         guildId: message.guild.id,
                         adapterCreator: message.guild.voiceAdapterCreator,
+                        daveEncryption: true,
                     });
                     console.log(`[AutoJoin] Automatically joined VC: ${targetChannel.name} for user: ${message.author.tag}`);
                     

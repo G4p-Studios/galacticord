@@ -28,9 +28,9 @@ case $choice in
 
     # Install system packages (Debian/Ubuntu focused)
     if command -v apt-get &> /dev/null; then
-        echo "Installing core dependencies: ffmpeg, curl, wget, git..."
+        echo "Installing core dependencies: ffmpeg, curl, wget, git, libsodium-dev..."
         $SUDO apt-get update -y
-        $SUDO apt-get install -y ffmpeg curl wget git
+        $SUDO apt-get install -y ffmpeg curl wget git libsodium-dev
     else
         echo "Non-Debian/Ubuntu system detected. Please ensure ffmpeg, curl, and wget are installed manually."
     fi

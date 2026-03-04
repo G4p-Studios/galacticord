@@ -56,6 +56,7 @@ module.exports = {
                     channelId: channel.id,
                     guildId: interaction.guild.id,
                     adapterCreator: interaction.guild.voiceAdapterCreator,
+                    daveEncryption: true,
                 });
 
                 const player = getPlayer(interaction.guild.id);

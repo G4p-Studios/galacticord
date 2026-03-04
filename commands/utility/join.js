@@ -18,6 +18,7 @@ module.exports = {
                 channelId: interaction.member.voice.channel.id,
                 guildId: interaction.guild.id,
                 adapterCreator: interaction.guild.voiceAdapterCreator,
+                daveEncryption: true,
             });
 
             await interaction.reply({ content: `Joined **${interaction.member.voice.channel.name}**! I am now listening for TTS messages.`, flags: MessageFlags.Ephemeral });

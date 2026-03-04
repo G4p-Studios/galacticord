@@ -20,6 +20,7 @@ module.exports = {
                 channelId: channel.id,
                 guildId: interaction.guild.id,
                 adapterCreator: interaction.guild.voiceAdapterCreator,
+                daveEncryption: true,
             });
 
             // Use direct URL as requested
