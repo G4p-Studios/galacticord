@@ -8,7 +8,7 @@ const WebSocket = require('ws');
 const { Readable } = require('stream');
 const textToSpeech = require('@google-cloud/text-to-speech');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const { PollyClient, SynthesizeSpeechCommand } = require("@aws-sdk/client-polly");
+const { PollyClient, SynthesizeSpeechCommand, DescribeVoicesCommand } = require("@aws-sdk/client-polly");
 
 // Initialize Google Cloud TTS Client with API Key from .env
 const gCloudClient = new textToSpeech.TextToSpeechClient({
@@ -19,7 +19,59 @@ const gCloudClient = new textToSpeech.TextToSpeechClient({
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-tts" });
 
-async function init() {} 
+async function init() {
+    try {
+        if (process.env.AWS_REGION && process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+            console.log("[Amazon Polly] Dynamically fetching complete voice list from AWS...");
+            const pollyClient = new PollyClient({
+                region: process.env.AWS_REGION,
+                credentials: {
+                    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+                    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+                }
+            });
+            
+            let voices = [];
+            let nextToken = undefined;
+            do {
+                const command = new DescribeVoicesCommand({ NextToken: nextToken });
+                const response = await pollyClient.send(command);
+                voices = voices.concat(response.Voices || []);
+                nextToken = response.NextToken;
+            } while (nextToken);
+
+            if (voices.length > 0) {
+                const voiceOptions = require('./voiceConstants');
+                // Clear existing static polly voices to prevent duplicates
+                for (const key in voiceOptions) {
+                    if (voiceOptions[key] && voiceOptions[key].polly) {
+                        delete voiceOptions[key];
+                    }
+                }
+                
+                // Add dynamically fetched voices to memory for Autocomplete
+                let addedCount = 0;
+                for (const voice of voices) {
+                    if (!voice.SupportedEngines) continue;
+                    for (const engine of voice.SupportedEngines) {
+                        const key = `polly-${engine}-${voice.Id}`;
+                        const engineLabel = engine.charAt(0).toUpperCase() + engine.slice(1);
+                        voiceOptions[key] = {
+                            label: `Amazon Polly - ${voice.Id} (${engineLabel}, ${voice.Gender}, ${voice.LanguageCode})`,
+                            polly: true,
+                            engine: engine,
+                            voiceId: voice.Id
+                        };
+                        addedCount++;
+                    }
+                }
+                console.log(`[Amazon Polly] Success! Dynamically cached ${voices.length} voices (${addedCount} total engine variants).`);
+            }
+        }
+    } catch (e) {
+        console.error("[Amazon Polly] Failed to fetch voices dynamically (falling back to static list):", e.message);
+    }
+} 
 function getEdgeVoices() { return []; }
 
 /**
