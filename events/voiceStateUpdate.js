@@ -48,9 +48,19 @@ module.exports = {
         // 1. Join/Leave/Switch Logic
         if (eventToggles.joinLeave) {
             if (!wasInChannel && isInChannel) {
-                textToSpeak = `${displayName} has joined the channel.`;
+                const customJoin = config[guildId]?.joinMessage;
+                if (customJoin) {
+                    textToSpeak = customJoin.includes('{user}') ? customJoin.replace('{user}', displayName) : `${displayName} ${customJoin}`;
+                } else {
+                    textToSpeak = `${displayName} has joined the channel.`;
+                }
             } else if (wasInChannel && !isInChannel) {
-                textToSpeak = `${displayName} has left the channel.`;
+                const customLeave = config[guildId]?.leaveMessage;
+                if (customLeave) {
+                    textToSpeak = customLeave.includes('{user}') ? customLeave.replace('{user}', displayName) : `${displayName} ${customLeave}`;
+                } else {
+                    textToSpeak = `${displayName} has left the channel.`;
+                }
             }
         }
 

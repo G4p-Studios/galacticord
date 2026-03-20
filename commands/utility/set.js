@@ -98,6 +98,24 @@ module.exports = {
                     option.setName('speak')
                         .setDescription('True to speak bot messages, False to ignore them (default).')
                         .setRequired(true)))
+        // Subcommand: Join Message
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('join_message')
+                .setDescription('Set a custom voice channel join message (use {user} for the username)')
+                .addStringOption(option =>
+                    option.setName('message')
+                        .setDescription('The message (e.g. "bursts into the room") or "reset" to restore default')
+                        .setRequired(true)))
+        // Subcommand: Leave Message
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('leave_message')
+                .setDescription('Set a custom voice channel leave message (use {user} for the username)')
+                .addStringOption(option =>
+                    option.setName('message')
+                        .setDescription('The message (e.g. "runs away and hides") or "reset" to restore default')
+                        .setRequired(true)))
         // Subcommand: Ducking
         .addSubcommand(subcommand =>
             subcommand
@@ -381,6 +399,24 @@ Server Default Provider switched to STAR.` });
                 await interaction.reply({ content: `Server Default TTS Provider is now: ${providerMap[provider] || provider}` });
             }
             fs.writeFileSync(ttsSettingsFile, JSON.stringify(settings, null, 2));
+
+        } else if (subcommand === 'join_message' || subcommand === 'leave_message') {
+            const message = interaction.options.getString('message');
+            const configKey = subcommand === 'join_message' ? 'joinMessage' : 'leaveMessage';
+            const label = subcommand === 'join_message' ? 'Join' : 'Leave';
+            let config = {};
+            try { if (fs.existsSync(serverConfigFile)) config = JSON.parse(fs.readFileSync(serverConfigFile, 'utf8')); } catch (e) {}
+            if (!config[interaction.guild.id]) config[interaction.guild.id] = {};
+            if (message.toLowerCase() === 'reset') {
+                delete config[interaction.guild.id][configKey];
+                fs.writeFileSync(serverConfigFile, JSON.stringify(config, null, 2));
+                await interaction.reply({ content: `${label} message reset to default.` });
+            } else {
+                config[interaction.guild.id][configKey] = message;
+                fs.writeFileSync(serverConfigFile, JSON.stringify(config, null, 2));
+                const preview = message.includes('{user}') ? message.replace('{user}', interaction.member.displayName) : `${interaction.member.displayName} ${message}`;
+                await interaction.reply({ content: `${label} message set. Preview: *"${preview}"*` });
+            }
 
         } else if (subcommand === 'ducking') {
             const percent = interaction.options.getInteger('percent');
