@@ -176,6 +176,14 @@ async function getAudioStream(text, provider, voiceKey) {
 
     console.log(`[TTS Provider] Requesting stream. Provider: ${cleanProvider}, Voice: ${cleanVoiceKey}, Text: "${sanitizedText.substring(0, 50)}..."`);
 
+    // SSML Detection
+    const ssmlTags = ['<speak', '<prosody', '<break', '<say-as', '<phoneme', '<emphasis', '<p>', '<s>', '<sub', '<mark', '<audio'];
+    const isSSML = ssmlTags.some(tag => sanitizedText.toLowerCase().includes(tag));
+    let finalText = sanitizedText;
+    if (isSSML && !finalText.toLowerCase().trim().startsWith('<speak>')) {
+        finalText = `<speak>${finalText}</speak>`;
+    }
+
     try {
         if (cleanProvider === 'google') {
             const voiceOptions = require('./voiceConstants');
@@ -210,13 +218,12 @@ async function getAudioStream(text, provider, voiceKey) {
 
             console.log(`[Google Cloud TTS] Synthesizing PCM with voice: ${voice} (${langCode})...`);
             const request = {
-                input: { text: sanitizedText },
+                input: isSSML ? { ssml: finalText } : { text: sanitizedText },
                 voice: { name: voice, languageCode: langCode },
                 audioConfig: { audioEncoding: 'LINEAR16', sampleRateHertz: 48000 },
             };
-            
-            const [response] = await gCloudClient.synthesizeSpeech(request);
-            console.log(`[Google Cloud TTS] Synthesis successful. Audio size: ${response.audioContent.length} bytes`);
+
+            const [response] = await gCloudClient.synthesizeSpeech(request);            console.log(`[Google Cloud TTS] Synthesis successful. Audio size: ${response.audioContent.length} bytes`);
 
             // For Buffer input, we spawn specifically
             const ffmpeg = spawn('ffmpeg', [
@@ -248,7 +255,8 @@ async function getAudioStream(text, provider, voiceKey) {
 
             const command = new SynthesizeSpeechCommand({
                 Engine: voiceConfig.engine || 'neural',
-                Text: sanitizedText.substring(0, 3000), // Polly max length
+                Text: isSSML ? finalText.substring(0, 3000) : sanitizedText.substring(0, 3000), // Polly max length
+                TextType: isSSML ? "ssml" : "text",
                 OutputFormat: "mp3",
                 VoiceId: voiceConfig.voiceId || "Matthew",
                 SampleRate: "24000"
