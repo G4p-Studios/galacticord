@@ -45,15 +45,16 @@ module.exports = {
         let textToSpeak = "";
         const displayName = newState.member.displayName;
 
+        // Load per-user settings
+        let userSettings = {};
+        try {
+            if (fs.existsSync(settingsFile)) {
+                userSettings = JSON.parse(fs.readFileSync(settingsFile, 'utf8')).users?.[newState.member.user.id] || {};
+            }
+        } catch (e) {}
+
         // 1. Join/Leave/Switch Logic
         if (eventToggles.joinLeave) {
-            let userSettings = {};
-            try {
-                if (fs.existsSync(settingsFile)) {
-                    userSettings = JSON.parse(fs.readFileSync(settingsFile, 'utf8')).users?.[newState.member.user.id] || {};
-                }
-            } catch (e) {}
-
             if (!wasInChannel && isInChannel) {
                 const customJoin = userSettings.joinMessage;
                 if (customJoin) {
@@ -74,7 +75,12 @@ module.exports = {
         // 2. Mute/Unmute Logic
         if (!textToSpeak && eventToggles.mute && isInChannel) {
             if (oldState.selfMute !== newState.selfMute) {
-                textToSpeak = `${displayName} is now ${newState.selfMute ? "muted" : "unmuted"}.`;
+                const customMsg = newState.selfMute ? userSettings.muteMessage : userSettings.unmuteMessage;
+                if (customMsg) {
+                    textToSpeak = customMsg.includes('{user}') ? customMsg.replace('{user}', displayName) : `${displayName} ${customMsg}`;
+                } else {
+                    textToSpeak = `${displayName} is now ${newState.selfMute ? "muted" : "unmuted"}.`;
+                }
             }
             else if (oldState.serverMute !== newState.serverMute) {
                 textToSpeak = `${displayName} was ${newState.serverMute ? "server muted" : "server unmuted"}.`;
@@ -84,7 +90,12 @@ module.exports = {
         // 3. Deafen/Undeafen Logic
         if (!textToSpeak && eventToggles.deafen && isInChannel) {
             if (oldState.selfDeaf !== newState.selfDeaf) {
-                textToSpeak = `${displayName} is now ${newState.selfDeaf ? "deafened" : "undeafened"}.`;
+                const customMsg = newState.selfDeaf ? userSettings.deafenMessage : userSettings.undeafenMessage;
+                if (customMsg) {
+                    textToSpeak = customMsg.includes('{user}') ? customMsg.replace('{user}', displayName) : `${displayName} ${customMsg}`;
+                } else {
+                    textToSpeak = `${displayName} is now ${newState.selfDeaf ? "deafened" : "undeafened"}.`;
+                }
             }
             else if (oldState.serverDeaf !== newState.serverDeaf) {
                 textToSpeak = `${displayName} was ${newState.serverDeaf ? "server deafened" : "server undeafened"}.`;

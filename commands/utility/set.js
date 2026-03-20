@@ -116,6 +116,42 @@ module.exports = {
                     option.setName('message')
                         .setDescription('The message (e.g. "runs away and hides") or "reset" to restore default')
                         .setRequired(true)))
+        // Subcommand: Mute Message
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('mute_message')
+                .setDescription('Set a custom message when you mute (use {user} for the username)')
+                .addStringOption(option =>
+                    option.setName('message')
+                        .setDescription('The message (e.g. "goes silent") or "reset" to restore default')
+                        .setRequired(true)))
+        // Subcommand: Unmute Message
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('unmute_message')
+                .setDescription('Set a custom message when you unmute (use {user} for the username)')
+                .addStringOption(option =>
+                    option.setName('message')
+                        .setDescription('The message (e.g. "speaks again") or "reset" to restore default')
+                        .setRequired(true)))
+        // Subcommand: Deafen Message
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('deafen_message')
+                .setDescription('Set a custom message when you deafen (use {user} for the username)')
+                .addStringOption(option =>
+                    option.setName('message')
+                        .setDescription('The message (e.g. "covers their ears") or "reset" to restore default')
+                        .setRequired(true)))
+        // Subcommand: Undeafen Message
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('undeafen_message')
+                .setDescription('Set a custom message when you undeafen (use {user} for the username)')
+                .addStringOption(option =>
+                    option.setName('message')
+                        .setDescription('The message (e.g. "can hear again") or "reset" to restore default')
+                        .setRequired(true)))
         // Subcommand: Ducking
         .addSubcommand(subcommand =>
             subcommand
@@ -400,10 +436,20 @@ Server Default Provider switched to STAR.` });
             }
             fs.writeFileSync(ttsSettingsFile, JSON.stringify(settings, null, 2));
 
-        } else if (subcommand === 'join_message' || subcommand === 'leave_message') {
+        } else if (['join_message', 'leave_message', 'mute_message', 'unmute_message', 'deafen_message', 'undeafen_message'].includes(subcommand)) {
             const message = interaction.options.getString('message');
-            const configKey = subcommand === 'join_message' ? 'joinMessage' : 'leaveMessage';
-            const label = subcommand === 'join_message' ? 'Join' : 'Leave';
+            const keyMap = {
+                join_message: 'joinMessage', leave_message: 'leaveMessage',
+                mute_message: 'muteMessage', unmute_message: 'unmuteMessage',
+                deafen_message: 'deafenMessage', undeafen_message: 'undeafenMessage'
+            };
+            const labelMap = {
+                join_message: 'Join', leave_message: 'Leave',
+                mute_message: 'Mute', unmute_message: 'Unmute',
+                deafen_message: 'Deafen', undeafen_message: 'Undeafen'
+            };
+            const configKey = keyMap[subcommand];
+            const label = labelMap[subcommand];
             let settings = { users: {}, servers: {} };
             try { if (fs.existsSync(ttsSettingsFile)) settings = JSON.parse(fs.readFileSync(ttsSettingsFile, 'utf8')); } catch (e) {}
             if (!settings.users[interaction.user.id]) settings.users[interaction.user.id] = {};
