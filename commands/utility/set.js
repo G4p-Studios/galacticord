@@ -98,6 +98,17 @@ module.exports = {
                     option.setName('speak')
                         .setDescription('True to speak bot messages, False to ignore them (default).')
                         .setRequired(true)))
+        // Subcommand: Ducking
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('ducking')
+                .setDescription('Set how much the sound file volume ducks when TTS speaks (0-100%, default 30%)')
+                .addIntegerOption(option =>
+                    option.setName('percent')
+                        .setDescription('Volume level during TTS (0 = silent, 100 = no ducking)')
+                        .setRequired(true)
+                        .setMinValue(0)
+                        .setMaxValue(100)))
         // Subcommand: Voice
         .addSubcommand(subcommand =>
             subcommand
@@ -370,6 +381,15 @@ Server Default Provider switched to STAR.` });
                 await interaction.reply({ content: `Server Default TTS Provider is now: ${providerMap[provider] || provider}` });
             }
             fs.writeFileSync(ttsSettingsFile, JSON.stringify(settings, null, 2));
+
+        } else if (subcommand === 'ducking') {
+            const percent = interaction.options.getInteger('percent');
+            let config = {};
+            try { if (fs.existsSync(serverConfigFile)) config = JSON.parse(fs.readFileSync(serverConfigFile, 'utf8')); } catch (e) {}
+            if (!config[interaction.guild.id]) config[interaction.guild.id] = {};
+            config[interaction.guild.id].duckingVolume = percent / 100;
+            fs.writeFileSync(serverConfigFile, JSON.stringify(config, null, 2));
+            await interaction.reply({ content: `Sound file ducking volume set to **${percent}%** during TTS.` });
 
         } else if (subcommand === 'voice') {
             const target = interaction.options.getString('target');

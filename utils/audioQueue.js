@@ -3,6 +3,8 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 const path = require('path');
 
+const serverConfigFile = path.join(__dirname, '../data/server_config.json');
+
 // Global Map to store queues and players per guild
 const guildQueues = new Map();
 // Cooldown map to prevent spamming restarts
@@ -81,20 +83,18 @@ function createSoundFileResource(filePath, seekSeconds) {
 
 /**
  * Creates a mixed audio resource: TTS overlaid on a ducked sound file.
- * Uses sidechaincompress so the sound file automatically ducks when TTS is present
- * and smoothly returns to full volume when TTS ends. Output lasts as long as the
- * longest input (the sound file), so no stop/start is needed.
+ * Ducks the sound file to 30% volume and mixes with TTS at full volume.
+ * Uses duration=longest so neither input gets cut off.
  */
-function createMixedResource(filePath, seekSeconds, ttsStream) {
+function createMixedResource(filePath, seekSeconds, ttsStream, duckVolume) {
+    const vol = duckVolume ?? 0.3;
     const ffmpeg = spawn('ffmpeg', [
         // Input 0: TTS (raw s16le PCM from stdin)
         '-f', 's16le', '-ar', '48000', '-ac', '2', '-i', 'pipe:0',
         // Input 1: Sound file from seek position
         '-ss', String(seekSeconds), '-i', filePath,
-        // Pad TTS with silence so the filter chain lives for the full sound file.
-        // sidechaincompress ducks sound file while TTS is present, then smoothly releases.
-        '-filter_complex',
-        '[0:a]apad[ttspad];[ttspad]asplit=2[tts][sc];[1:a][sc]sidechaincompress=threshold=0.01:ratio=6:attack=50:release=500[ducked];[tts][ducked]amix=inputs=2:duration=shortest:normalize=0',
+        // Duck sound file, mix both, output lasts until both finish
+        '-filter_complex', `[1:a]volume=${vol}[ducked];[0:a][ducked]amix=inputs=2:duration=longest:normalize=0`,
         '-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1'
     ]);
 
@@ -222,7 +222,12 @@ function addToQueue(guildId, ttsStream, connection) {
         guildData.soundFileElapsed += (Date.now() - guildData.soundFilePlaybackStart) / 1000;
         guildData.soundFilePlaybackStart = Date.now();
         guildData.isPlayingTTS = true;
-        const mixed = createMixedResource(guildData.soundFilePath, guildData.soundFileElapsed, ttsStream);
+        let duckVolume = 0.3;
+        try {
+            const config = JSON.parse(fs.readFileSync(serverConfigFile, 'utf8'));
+            if (config[guildId]?.duckingVolume !== undefined) duckVolume = config[guildId].duckingVolume;
+        } catch (e) {}
+        const mixed = createMixedResource(guildData.soundFilePath, guildData.soundFileElapsed, ttsStream, duckVolume);
         guildData.player.play(mixed);
     } else if (guildData.isPlayingTTS) {
         guildData.queue.push(ttsStream);
