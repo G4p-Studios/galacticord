@@ -47,15 +47,22 @@ module.exports = {
 
         // 1. Join/Leave/Switch Logic
         if (eventToggles.joinLeave) {
+            let userSettings = {};
+            try {
+                if (fs.existsSync(settingsFile)) {
+                    userSettings = JSON.parse(fs.readFileSync(settingsFile, 'utf8')).users?.[newState.member.user.id] || {};
+                }
+            } catch (e) {}
+
             if (!wasInChannel && isInChannel) {
-                const customJoin = config[guildId]?.joinMessage;
+                const customJoin = userSettings.joinMessage;
                 if (customJoin) {
                     textToSpeak = customJoin.includes('{user}') ? customJoin.replace('{user}', displayName) : `${displayName} ${customJoin}`;
                 } else {
                     textToSpeak = `${displayName} has joined the channel.`;
                 }
             } else if (wasInChannel && !isInChannel) {
-                const customLeave = config[guildId]?.leaveMessage;
+                const customLeave = userSettings.leaveMessage;
                 if (customLeave) {
                     textToSpeak = customLeave.includes('{user}') ? customLeave.replace('{user}', displayName) : `${displayName} ${customLeave}`;
                 } else {

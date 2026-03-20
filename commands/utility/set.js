@@ -404,16 +404,16 @@ Server Default Provider switched to STAR.` });
             const message = interaction.options.getString('message');
             const configKey = subcommand === 'join_message' ? 'joinMessage' : 'leaveMessage';
             const label = subcommand === 'join_message' ? 'Join' : 'Leave';
-            let config = {};
-            try { if (fs.existsSync(serverConfigFile)) config = JSON.parse(fs.readFileSync(serverConfigFile, 'utf8')); } catch (e) {}
-            if (!config[interaction.guild.id]) config[interaction.guild.id] = {};
+            let settings = { users: {}, servers: {} };
+            try { if (fs.existsSync(ttsSettingsFile)) settings = JSON.parse(fs.readFileSync(ttsSettingsFile, 'utf8')); } catch (e) {}
+            if (!settings.users[interaction.user.id]) settings.users[interaction.user.id] = {};
             if (message.toLowerCase() === 'reset') {
-                delete config[interaction.guild.id][configKey];
-                fs.writeFileSync(serverConfigFile, JSON.stringify(config, null, 2));
+                delete settings.users[interaction.user.id][configKey];
+                fs.writeFileSync(ttsSettingsFile, JSON.stringify(settings, null, 2));
                 await interaction.reply({ content: `${label} message reset to default.` });
             } else {
-                config[interaction.guild.id][configKey] = message;
-                fs.writeFileSync(serverConfigFile, JSON.stringify(config, null, 2));
+                settings.users[interaction.user.id][configKey] = message;
+                fs.writeFileSync(ttsSettingsFile, JSON.stringify(settings, null, 2));
                 const preview = message.includes('{user}') ? message.replace('{user}', interaction.member.displayName) : `${interaction.member.displayName} ${message}`;
                 await interaction.reply({ content: `${label} message set. Preview: *"${preview}"*` });
             }
