@@ -8,6 +8,7 @@ const WebSocket = require('ws');
 const { Readable } = require('stream');
 const textToSpeech = require('@google-cloud/text-to-speech');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { PollyClient, SynthesizeSpeechCommand } = require("@aws-sdk/client-polly");
 
 // Initialize Google Cloud TTS Client with API Key from .env
 const gCloudClient = new textToSpeech.TextToSpeechClient({
@@ -174,6 +175,50 @@ async function getAudioStream(text, provider, voiceKey) {
                 'pipe:1'
             ]);
             ffmpeg.stdin.write(response.audioContent);
+            ffmpeg.stdin.end();
+            return ffmpeg.stdout;
+
+        } else if (cleanProvider === 'polly') {
+            console.log(`[Amazon Polly] Synthesizing... VoiceKey: ${cleanVoiceKey}`);
+            
+            const pollyClient = new PollyClient({
+                region: process.env.AWS_REGION || "us-east-1",
+                ...(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && {
+                    credentials: {
+                        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+                        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+                    }
+                })
+            });
+
+            const voiceOptions = require('./voiceConstants');
+            const voiceConfig = voiceOptions[cleanVoiceKey] || voiceOptions['polly-neural-Matthew'];
+
+            const command = new SynthesizeSpeechCommand({
+                Engine: voiceConfig.engine || 'neural',
+                Text: sanitizedText.substring(0, 3000), // Polly max length
+                OutputFormat: "mp3",
+                VoiceId: voiceConfig.voiceId || "Matthew",
+                SampleRate: "24000"
+            });
+
+            const response = await pollyClient.send(command);
+            
+            // v3 stream extraction
+            const audioArray = await response.AudioStream.transformToByteArray();
+            const buffer = Buffer.from(audioArray);
+            
+            console.log(`[Amazon Polly] Success. Audio size: ${buffer.length} bytes`);
+
+            const ffmpeg = spawn('ffmpeg', [
+                '-i', 'pipe:0',
+                '-f', 's16le',
+                '-ar', '48000',
+                '-ac', '2',
+                'pipe:1'
+            ]);
+
+            ffmpeg.stdin.write(buffer);
             ffmpeg.stdin.end();
             return ffmpeg.stdout;
 

@@ -51,6 +51,7 @@ module.exports = {
                             { name: 'Google Translate (Simple, Fast)', value: 'google' },
                             { name: 'Google Cloud (Official - Neural, Studio, HD3)', value: 'google-cloud' },
                             { name: 'Gemini TTS (Official - Flash 2.5)', value: 'gemini' },
+                            { name: 'Amazon Polly (Standard/Neural/Generative)', value: 'polly' },
                             { name: 'Piper (High Quality Local TTS)', value: 'piper' },
                             { name: 'eSpeak-ng (Classic Synth)', value: 'espeak' },
                             { name: 'RHVoice (Natural local voices)', value: 'rhvoice' },
@@ -162,6 +163,13 @@ module.exports = {
         } else if (mode === 'gemini') {
             choices = Object.entries(voiceOptions)
                 .filter(([key, value]) => value.gemini)
+                .map(([key, value]) => ({
+                    name: value.label,
+                    value: key
+                }));
+        } else if (mode === 'polly') {
+            choices = Object.entries(voiceOptions)
+                .filter(([key, value]) => value.polly)
                 .map(([key, value]) => ({
                     name: value.label,
                     value: key
@@ -338,6 +346,7 @@ Server Default Provider switched to STAR.` });
                     'google': 'Google Translate', 
                     'google-cloud': 'Google Cloud (Official)', 
                     'gemini': 'Gemini TTS (Flash 2.5)',
+                    'polly': 'Amazon Polly',
                     'piper': 'Piper', 
                     'espeak': 'eSpeak-ng', 
                     'rhvoice': 'RHVoice', 
@@ -352,6 +361,7 @@ Server Default Provider switched to STAR.` });
                     'google': 'Google Translate', 
                     'google-cloud': 'Google Cloud (Official)', 
                     'gemini': 'Gemini TTS (Flash 2.5)',
+                    'polly': 'Amazon Polly',
                     'piper': 'Piper', 
                     'espeak': 'eSpeak-ng', 
                     'rhvoice': 'RHVoice', 

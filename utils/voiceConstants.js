@@ -101,5 +101,17 @@ module.exports = {
     'gemini-Umbriel': { label: '♊ Gemini Umbriel', gemini: true, voiceKey: 'Umbriel' },
     'gemini-Vindemiatrix': { label: '♊ Gemini Vindemiatrix', gemini: true, voiceKey: 'Vindemiatrix' },
     'gemini-Zephyr': { label: '♊ Gemini Zephyr (Female)', gemini: true, voiceKey: 'Zephyr' },
-    'gemini-Zubenelgenubi': { label: '♊ Gemini Zubenelgenubi', gemini: true, voiceKey: 'Zubenelgenubi' }
+    'gemini-Zubenelgenubi': { label: '♊ Gemini Zubenelgenubi', gemini: true, voiceKey: 'Zubenelgenubi' },
+
+    // --- Amazon Polly ---
+    'polly-generative-Ruth': { label: 'Amazon Polly - Ruth (Generative, Female)', polly: true, engine: 'generative', voiceId: 'Ruth' },
+    'polly-generative-Matthew': { label: 'Amazon Polly - Matthew (Generative, Male)', polly: true, engine: 'generative', voiceId: 'Matthew' },
+    'polly-generative-Amy': { label: 'Amazon Polly - Amy (Generative, Female, UK)', polly: true, engine: 'generative', voiceId: 'Amy' },
+    'polly-neural-Joanna': { label: 'Amazon Polly - Joanna (Neural, Female)', polly: true, engine: 'neural', voiceId: 'Joanna' },
+    'polly-neural-Matthew': { label: 'Amazon Polly - Matthew (Neural, Male)', polly: true, engine: 'neural', voiceId: 'Matthew' },
+    'polly-neural-Kendra': { label: 'Amazon Polly - Kendra (Neural, Female)', polly: true, engine: 'neural', voiceId: 'Kendra' },
+    'polly-neural-Brian': { label: 'Amazon Polly - Brian (Neural, Male, UK)', polly: true, engine: 'neural', voiceId: 'Brian' },
+    'polly-standard-Salli': { label: 'Amazon Polly - Salli (Standard, Female)', polly: true, engine: 'standard', voiceId: 'Salli' },
+    'polly-standard-Joey': { label: 'Amazon Polly - Joey (Standard, Male)', polly: true, engine: 'standard', voiceId: 'Joey' },
+    'polly-standard-Ivy': { label: 'Amazon Polly - Ivy (Standard, Female, Child)', polly: true, engine: 'standard', voiceId: 'Ivy' }
 };

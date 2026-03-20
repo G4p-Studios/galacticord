@@ -44,13 +44,25 @@ function Configure-Env {
     $ownerId = Read-Host "Bot Owner ID (Current: $($current['OWNER_ID'] ?? 'None'))"
     if ([string]::IsNullOrWhiteSpace($ownerId)) { $ownerId = $current['OWNER_ID'] }
 
+    $awsRegion = Read-Host "AWS Region for Polly (Current: $($current['AWS_REGION'] ?? 'None'))"
+    if ([string]::IsNullOrWhiteSpace($awsRegion)) { $awsRegion = $current['AWS_REGION'] }
+
+    $awsAccess = Read-Host "AWS Access Key ID (Current: $($current['AWS_ACCESS_KEY_ID'] ?? 'None'))"
+    if ([string]::IsNullOrWhiteSpace($awsAccess)) { $awsAccess = $current['AWS_ACCESS_KEY_ID'] }
+
+    $awsSecret = Read-Host "AWS Secret Access Key (Current: $($current['AWS_SECRET_ACCESS_KEY'] ?? 'None'))"
+    if ([string]::IsNullOrWhiteSpace($awsSecret)) { $awsSecret = $current['AWS_SECRET_ACCESS_KEY'] }
+
     $content = @(
         "DISCORD_TOKEN=$token",
         "CLIENT_ID=$clientId",
         "GEMINI_API_KEY=$geminiKey",
         "GOOGLE_CLOUD_API_KEY=$gcloudKey",
         "YOUTUBE_API_KEY=$ytKey",
-        "OWNER_ID=$ownerId"
+        "OWNER_ID=$ownerId",
+        "AWS_REGION=$awsRegion",
+        "AWS_ACCESS_KEY_ID=$awsAccess",
+        "AWS_SECRET_ACCESS_KEY=$awsSecret"
     )
 
     $content | Out-File -FilePath $envFile -Encoding utf8 -NoNewline
