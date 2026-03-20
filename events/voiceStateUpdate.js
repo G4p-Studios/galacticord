@@ -2,7 +2,7 @@ const { Events } = require('discord.js');
 const { getVoiceConnection } = require('@discordjs/voice');
 const fs = require('fs');
 const path = require('path');
-const { getAudioResource } = require('../utils/ttsProvider');
+const { getAudioStream } = require('../utils/ttsProvider');
 const { addToQueue } = require('../utils/audioQueue');
 
 const settingsFile = path.join(__dirname, '../data/tts_settings.json');
@@ -110,8 +110,8 @@ module.exports = {
             }
 
             console.log(`[VoiceEvent] ${textToSpeak}`);
-            const resource = await getAudioResource(textToSpeak, mode, voiceKey);
-            addToQueue(guildId, resource, connection);
+            const stream = await getAudioStream(textToSpeak, mode, voiceKey);
+            addToQueue(guildId, stream, connection);
 
         } catch (error) {
             console.error('[VoiceStateUpdate] Error:', error);

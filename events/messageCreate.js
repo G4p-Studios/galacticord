@@ -2,7 +2,7 @@ const { Events } = require('discord.js');
 const { getVoiceConnection, joinVoiceChannel } = require('@discordjs/voice');
 const fs = require('fs');
 const path = require('path');
-const { getAudioResource } = require('../utils/ttsProvider');
+const { getAudioStream } = require('../utils/ttsProvider');
 const { addToQueue } = require('../utils/audioQueue');
 
 const settingsFile = path.join(__dirname, '../data/tts_settings.json');
@@ -252,10 +252,10 @@ module.exports = {
 
             // Get Resource from Provider
             const textToSpeak = `${message.member?.displayName || message.author.username} said: ${cleanContent}`;
-            const resource = await getAudioResource(textToSpeak, mode, voiceKey);
+            const stream = await getAudioStream(textToSpeak, mode, voiceKey);
 
             // Add to the shared queue
-            addToQueue(message.guild.id, resource, connection);
+            addToQueue(message.guild.id, stream, connection);
 
         } catch (error) {
             console.error('[MessageCreate Debug] Uncaught TTS Error:', error);

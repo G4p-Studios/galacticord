@@ -1,8 +1,11 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection, StreamType } = require('@discordjs/voice');
-const { spawn } = require('child_process');
+const { joinVoiceChannel, getVoiceConnection } = require('@discordjs/voice');
 const https = require('https');
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const { playSoundFile } = require('../../utils/audioQueue');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -37,33 +40,19 @@ module.exports = {
         await interaction.deferReply();
 
         try {
-            // Join the voice channel
-            const existingConnection = getVoiceConnection(interaction.guild.id);
-            const connection = existingConnection || joinVoiceChannel({
+            const connection = getVoiceConnection(interaction.guild.id) || joinVoiceChannel({
                 channelId: channel.id,
                 guildId: interaction.guild.id,
                 adapterCreator: interaction.guild.voiceAdapterCreator,
                 daveEncryption: true,
             });
 
-            // Download and pipe through ffmpeg to normalize audio
-            const fetcher = attachment.url.startsWith('https') ? https : http;
-            fetcher.get(attachment.url, (response) => {
-                if (response.statusCode === 301 || response.statusCode === 302) {
-                    const redirectFetcher = response.headers.location.startsWith('https') ? https : http;
-                    redirectFetcher.get(response.headers.location, (redirected) => {
-                        playStream(redirected, connection, existingConnection, interaction, attachment.name);
-                    }).on('error', (err) => {
-                        console.error('[pfile] Redirect download error:', err);
-                        interaction.editReply('Failed to download the audio file.');
-                    });
-                    return;
-                }
-                playStream(response, connection, existingConnection, interaction, attachment.name);
-            }).on('error', (err) => {
-                console.error('[pfile] Download error:', err);
-                interaction.editReply('Failed to download the audio file.');
-            });
+            // Download to temp file so we can seek into it for mixing
+            const tmpFile = path.join(os.tmpdir(), `pfile_${interaction.guild.id}_${Date.now()}${path.extname(attachment.name)}`);
+            await downloadFile(attachment.url, tmpFile);
+
+            playSoundFile(interaction.guild.id, tmpFile, connection);
+            await interaction.editReply(`Playing **${attachment.name}**...`);
 
         } catch (error) {
             console.error('[pfile] Error:', error);
@@ -72,57 +61,18 @@ module.exports = {
     },
 };
 
-function playStream(stream, connection, existingConnection, interaction, filename) {
-    const ffmpeg = spawn('ffmpeg', [
-        '-i', 'pipe:0',
-        '-f', 's16le',
-        '-ar', '48000',
-        '-ac', '2',
-        'pipe:1'
-    ]);
-
-    stream.pipe(ffmpeg.stdin);
-
-    stream.on('error', (err) => {
-        console.error('[pfile] Stream error:', err);
-        ffmpeg.stdin.end();
-    });
-
-    ffmpeg.stderr.on('data', (data) => {
-        const msg = data.toString().trim();
-        if (msg.includes('Error') || msg.includes('failed') || msg.includes('Invalid')) {
-            console.error(`[pfile FFmpeg] ${msg}`);
-        }
-    });
-
-    ffmpeg.on('error', (err) => {
-        console.error('[pfile] FFmpeg error:', err);
-        interaction.editReply('Failed to process the audio file.');
-    });
-
-    const resource = createAudioResource(ffmpeg.stdout, {
-        inputType: StreamType.Raw,
-    });
-
-    const player = createAudioPlayer();
-    connection.subscribe(player);
-    player.play(resource);
-
-    interaction.editReply(`Playing **${filename}**...`);
-
-    player.on(AudioPlayerStatus.Idle, () => {
-        player.stop();
-        // Only disconnect if the bot wasn't already in the channel
-        if (!existingConnection) {
-            connection.destroy();
-        }
-    });
-
-    player.on('error', (error) => {
-        console.error('[pfile] Player error:', error.message);
-        interaction.editReply(`Failed to play **${filename}**: ${error.message}`);
-        if (!existingConnection) {
-            connection.destroy();
-        }
+function downloadFile(url, dest) {
+    return new Promise((resolve, reject) => {
+        const fetcher = url.startsWith('https') ? https : http;
+        fetcher.get(url, (response) => {
+            if (response.statusCode === 301 || response.statusCode === 302) {
+                downloadFile(response.headers.location, dest).then(resolve).catch(reject);
+                return;
+            }
+            const file = fs.createWriteStream(dest);
+            response.pipe(file);
+            file.on('finish', () => { file.close(); resolve(); });
+            file.on('error', (err) => { fs.unlink(dest, () => {}); reject(err); });
+        }).on('error', (err) => { fs.unlink(dest, () => {}); reject(err); });
     });
 }
