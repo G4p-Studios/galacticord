@@ -147,6 +147,7 @@ function initGuildData(guildId) {
             if (currentData.queue.length > 0) {
                 console.log(`[AudioQueue] Playing next TTS from queue.`);
                 const nextStream = currentData.queue.shift();
+                nextStream.on('error', () => {});
                 currentData.isPlayingTTS = true;
                 player.play(createAudioResource(nextStream, { inputType: StreamType.Raw }));
             } else {
@@ -240,6 +241,7 @@ function addToQueue(guildId, ttsStream, connection) {
         console.log(`[AudioQueue] TTS added to queue.`);
     } else {
         console.log(`[AudioQueue] Interrupting for TTS.`);
+        ttsStream.on('error', () => {});
         guildData.isPlayingTTS = true;
         const resource = createAudioResource(ttsStream, { inputType: StreamType.Raw });
         guildData.player.play(resource);
@@ -276,6 +278,10 @@ function silenceAll(guildId) {
     console.log(`[AudioQueue] Silencing all audio.`);
     guildData.backgroundUrl = null;
     guildData.resumeCallback = null;
+    for (const stream of guildData.queue) {
+        stream.on('error', () => {});
+        stream.destroy();
+    }
     guildData.queue.length = 0;
     guildData.isPlayingTTS = false;
     if (guildData.isPlayingSoundFile && guildData.soundFilePath) {
