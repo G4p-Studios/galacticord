@@ -264,6 +264,23 @@ function playSoundFile(guildId, filePath, connection) {
     guildData.player.play(createSoundFileResource(filePath, 0));
 }
 
+function silenceAll(guildId) {
+    const guildData = guildQueues.get(guildId);
+    if (!guildData) return;
+    console.log(`[AudioQueue] Silencing all audio.`);
+    guildData.backgroundUrl = null;
+    guildData.resumeCallback = null;
+    guildData.queue.length = 0;
+    guildData.isPlayingTTS = false;
+    if (guildData.isPlayingSoundFile && guildData.soundFilePath) {
+        fs.unlink(guildData.soundFilePath, () => {});
+    }
+    guildData.isPlayingSoundFile = false;
+    guildData.soundFilePath = null;
+    guildData.soundFileElapsed = 0;
+    guildData.player.stop();
+}
+
 function setMusicResume(guildId, callback) {
     const guildData = initGuildData(guildId);
     guildData.resumeCallback = callback;
@@ -274,4 +291,4 @@ function getPlayer(guildId) {
     return guildData.player;
 }
 
-module.exports = { addToQueue, playSoundFile, setBackground, stopBackground, setMusicResume, getPlayer };
+module.exports = { addToQueue, playSoundFile, setBackground, stopBackground, silenceAll, setMusicResume, getPlayer };
