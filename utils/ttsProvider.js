@@ -165,6 +165,10 @@ function normalizeStream(stream) {
         '-ac', '2',
         'pipe:1'
     ]);
+    stream.on('error', () => {});
+    ffmpeg.stdin.on('error', () => {});
+    ffmpeg.stdout.on('error', () => {});
+    ffmpeg.on('error', () => {});
     stream.pipe(ffmpeg.stdin);
     return ffmpeg.stdout;
 }
@@ -233,6 +237,9 @@ async function getAudioStream(text, provider, voiceKey) {
                 '-ac', '2',
                 'pipe:1'
             ]);
+            ffmpeg.stdin.on('error', () => {});
+            ffmpeg.stdout.on('error', () => {});
+            ffmpeg.on('error', () => {});
             ffmpeg.stdin.write(response.audioContent);
             ffmpeg.stdin.end();
             return ffmpeg.stdout;
@@ -278,6 +285,9 @@ async function getAudioStream(text, provider, voiceKey) {
                 'pipe:1'
             ]);
 
+            ffmpeg.stdin.on('error', () => {});
+            ffmpeg.stdout.on('error', () => {});
+            ffmpeg.on('error', () => {});
             ffmpeg.stdin.write(buffer);
             ffmpeg.stdin.end();
             return ffmpeg.stdout;
@@ -351,6 +361,9 @@ async function getAudioStream(text, provider, voiceKey) {
                 }
             });
 
+            ffmpeg.stdin.on('error', () => {});
+            ffmpeg.stdout.on('error', () => {});
+            ffmpeg.on('error', () => {});
             ffmpeg.stdin.write(buffer);
             ffmpeg.stdin.end();
             return ffmpeg.stdout;
