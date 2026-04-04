@@ -37,6 +37,9 @@ function createRadioResource(resourceUrl) {
 
     // Pipe curl output to ffmpeg input
     curl.stdout.pipe(ffmpeg.stdin);
+    ffmpeg.stdin.on('error', () => {});
+    ffmpeg.stdout.on('error', () => {});
+    curl.stdout.on('error', () => {});
 
     curl.stderr.on('data', (d) => {
         // console.log(`[Curl] ${d.toString()}`); // debug if needed
@@ -75,6 +78,7 @@ function createSoundFileResource(filePath, seekSeconds) {
     args.push('-i', filePath, '-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1');
 
     const ffmpeg = spawn('ffmpeg', args);
+    ffmpeg.stdout.on('error', () => {});
     ffmpeg.stderr.on('data', () => {});
     ffmpeg.on('error', (err) => console.error(`[SoundFile FFmpeg] ${err.message}`));
 
@@ -100,6 +104,8 @@ function createMixedResource(filePath, seekSeconds, ttsStream, duckVolume) {
 
     ttsStream.pipe(ffmpeg.stdin);
     ttsStream.on('error', () => ffmpeg.stdin.end());
+    ffmpeg.stdin.on('error', () => {});
+    ffmpeg.stdout.on('error', () => {});
     ffmpeg.stderr.on('data', () => {});
     ffmpeg.on('error', (err) => console.error(`[Mix FFmpeg] ${err.message}`));
 
