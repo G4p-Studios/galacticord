@@ -57,6 +57,13 @@ module.exports = {
                         name: value.label,
                         value: key
                     }));
+            } else if (mode === 'polly') {
+                choices = Object.entries(voiceOptions)
+                    .filter(([key, value]) => value.polly)
+                    .map(([key, value]) => ({
+                        name: value.label,
+                        value: key
+                    }));
             } else if (mode === 'piper') {
                 const modelsDir = path.join(__dirname, '../../models');
                 if (fs.existsSync(modelsDir)) {
@@ -80,7 +87,12 @@ module.exports = {
             } else if (mode === 'rhvoice') {
                 choices = [
                     { name: 'Alan (English)', value: 'alan' },
-                    { name: 'Aleksandr (Russian)', value: 'aleksandr' }
+                    { name: 'Bcl (English)', value: 'bdl' },
+                    { name: 'Slt (English)', value: 'slt' },
+                    { name: 'Aleksandr (Russian)', value: 'aleksandr' },
+                    { name: 'Anna (Russian)', value: 'anna' },
+                    { name: 'Elena (Russian)', value: 'elena' },
+                    { name: 'Irina (Russian)', value: 'irina' }
                 ];
             } else if (mode === 'star') {
                 let settings = { users: {}, servers: {} };
@@ -193,15 +205,6 @@ module.exports = {
             ffmpeg.on('error', (err) => {
                 console.error(err);
                 interaction.editReply('Failed to write audio file.');
-            });
-
-        } catch (error) {
-            console.error(error);
-            await interaction.editReply('Failed to generate TTS audio file.');
-        }
-    },
-};
-tReply('Failed to write audio file.');
             });
 
         } catch (error) {
