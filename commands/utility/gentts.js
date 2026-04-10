@@ -16,6 +16,7 @@ module.exports = {
                     { name: 'Google Translate', value: 'google' },
                     { name: 'Google Cloud (Official)', value: 'google-cloud' },
                     { name: 'Gemini TTS (Flash 2.5)', value: 'gemini' },
+                    { name: 'Amazon Polly (Standard/Neural/Generative)', value: 'polly' },
                     { name: 'Piper (High Quality)', value: 'piper' },
                     { name: 'eSpeak-ng (Classic Synth)', value: 'espeak' },
                     { name: 'RHVoice (Local Natural)', value: 'rhvoice' },
@@ -192,6 +193,15 @@ module.exports = {
             ffmpeg.on('error', (err) => {
                 console.error(err);
                 interaction.editReply('Failed to write audio file.');
+            });
+
+        } catch (error) {
+            console.error(error);
+            await interaction.editReply('Failed to generate TTS audio file.');
+        }
+    },
+};
+tReply('Failed to write audio file.');
             });
 
         } catch (error) {
