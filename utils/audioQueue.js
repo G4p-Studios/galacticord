@@ -132,6 +132,8 @@ function initGuildData(guildId) {
             const currentData = guildQueues.get(guildId);
             if (!currentData) return;
 
+            const wasPlayingTTS = currentData.isPlayingTTS;
+
             if (currentData.isPlayingSoundFile) {
                 // Sound file finished (either alone or via a duration=longest mix)
                 console.log(`[AudioQueue] Sound file finished.`);
@@ -163,8 +165,8 @@ function initGuildData(guildId) {
                 }
 
                 if (currentData.resumeCallback) {
-                    console.log(`[AudioQueue] Executing resume callback for music.`);
-                    currentData.resumeCallback();
+                    console.log(`[AudioQueue] Executing resume callback for music (wasPlayingTTS=${wasPlayingTTS}).`);
+                    currentData.resumeCallback(wasPlayingTTS);
                 } else if (currentData.backgroundUrl) {
                     const now = Date.now();
                     const lastTime = lastRestart.get(guildId) || 0;
@@ -303,4 +305,9 @@ function getPlayer(guildId) {
     return guildData.player;
 }
 
-module.exports = { addToQueue, playSoundFile, setBackground, stopBackground, silenceAll, setMusicResume, getPlayer };
+function isGuildPlayingTTS(guildId) {
+    const data = guildQueues.get(guildId);
+    return data ? data.isPlayingTTS : false;
+}
+
+module.exports = { addToQueue, playSoundFile, setBackground, stopBackground, silenceAll, setMusicResume, getPlayer, isGuildPlayingTTS };

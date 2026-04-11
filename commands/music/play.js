@@ -72,23 +72,25 @@ module.exports = {
                 queue.connection.subscribe(queue.player);
 
                 // Register resumption callback for TTS interruption
-                setMusicResume(interaction.guild.id, () => {
+                setMusicResume(interaction.guild.id, (wasPlayingTTS) => {
                     const q = interaction.client.queues.get(interaction.guild.id);
-                    if (q && q.songs.length > 0) {
-                        console.log(`[Music] Resuming YouTube playback after TTS...`);
-                        playNext(interaction.guild.id, interaction.client, true); // true = isResume
+                    if (!q) return;
+
+                    if (!wasPlayingTTS) {
+                        // Normal song completion — advance to next song
+                        q.songs.shift();
+                    }
+                    // If wasPlayingTTS, resume current song (don't shift)
+
+                    if (q.songs.length > 0) {
+                        console.log(`[Music] ${wasPlayingTTS ? 'Resuming' : 'Playing next'} YouTube playback...`);
+                        playNext(interaction.guild.id, interaction.client);
                     }
                 });
 
-                // Standard idle handling (song finished)
+                // Standard idle handling — managed via audioQueue.js resumeCallback
                 queue.player.on(AudioPlayerStatus.Idle, () => {
-                    const q = interaction.client.queues.get(interaction.guild.id);
-                    if (!q) return;
-                    
-                    // Only shift and play next if we aren't currently playing TTS
-                    // If we ARE playing TTS, the audioQueue.js handler will trigger the resume callback
-                    const { isPlayingTTS } = require('../../utils/audioQueue'); // Dynamic check
-                    // Actually, we can check guildQueues directly if exported, or just trust the resumeCallback
+                    // Song transitions are handled by the resumeCallback above
                 });
 
                 queue.player.on('error', error => {
@@ -115,15 +117,9 @@ module.exports = {
     },
 };
 
-async function playNext(guildId, client, isResume = false) {
+async function playNext(guildId, client) {
     const queue = client.queues.get(guildId);
     if (!queue || queue.songs.length === 0) return;
-
-    // Only skip to next song if this ISN'T a resumption from TTS
-    if (queue.player.state.status === AudioPlayerStatus.Idle && !isResume) {
-        queue.songs.shift();
-        if (queue.songs.length === 0) return;
-    }
 
     const song = queue.songs[0];
     if (!song) return;
