@@ -14,17 +14,13 @@ async function sendModLog(guild, embed) {
 }
 
 function verboseLog(guild, message) {
-    let config = {};
-    try {
-        if (fs.existsSync(configFile)) {
-            config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-        }
-    } catch (e) {}
-
-    const isVerbose = config[guild?.id]?.verboseLogging || process.env.VERBOSE_LOGGING === 'true';
+    // Always on for now as requested
+    const isVerbose = true; 
+    
     if (isVerbose) {
         const timestamp = new Date().toISOString();
-        console.log(`[VERBOSE][${timestamp}]${guild ? `[${guild.name}]` : ''} ${message}`);
+        const guildName = guild ? `[${guild.name}]` : '[System]';
+        console.log(`[VERBOSE][${timestamp}]${guildName} ${message}`);
     }
 }
 

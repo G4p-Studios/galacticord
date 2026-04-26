@@ -5,6 +5,7 @@ const { fetchLatestAuditLog } = require('../utils/auditLogUtil');
 module.exports = {
     name: Events.MessageDelete,
     async execute(message) {
+        console.log(`[EVENT] MessageDelete triggered for ID: ${message.id} in #${message.channel.name}`);
         verboseLog(message.guild, `Message delete event received for ID: ${message.id} in ${message.channel.name}`);
         if (!message.guild || message.author?.bot) return;
 

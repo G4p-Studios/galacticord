@@ -6,17 +6,17 @@ const path = require('path');
 
 module.exports = {
     name: Events.MessageBulkDelete,
-    async execute(messages) {
-        const firstMsg = messages.first();
-        const guild = firstMsg?.guild;
-        const channel = firstMsg?.channel;
-
-        verboseLog(guild, `Bulk delete event received. Count: ${messages.size} in ${channel?.name || 'Unknown Channel'}`);
+    async execute(messages, channel) {
+        // Direct console log so you can see it hitting immediately
+        console.log(`[EVENT] MessageBulkDelete triggered in #${channel.name}. Count: ${messages.size}`);
+        
+        const guild = channel.guild;
+        verboseLog(guild, `Bulk delete event received. Count: ${messages.size} in ${channel.name}`);
 
         if (!guild) return;
 
         // 1. Create the transcript content
-        let transcript = `PURGE LOG - CHANNEL: #${channel?.name || 'Unknown'} (${channel?.id || 'Unknown'})\n`;
+        let transcript = `PURGE LOG - CHANNEL: #${channel.name} (${channel.id})\n`;
         transcript += `TIME: ${new Date().toUTCString()}\n`;
         transcript += `TOTAL MESSAGES: ${messages.size}\n`;
         transcript += `----------------------------------------------------\n\n`;
@@ -26,13 +26,14 @@ module.exports = {
         
         sortedMessages.forEach(msg => {
             const time = msg.createdAt ? msg.createdAt.toISOString() : 'Unknown Time';
-            const author = msg.author ? msg.author.tag : `Unknown Author (${msg.authorId || 'No ID'})`;
+            // If the message is partial/uncached, we might only have the ID
+            const author = msg.author ? msg.author.tag : `Unknown Author (ID: ${msg.authorId || 'N/A'})`;
             const content = msg.content || '[No Text Content / Uncached]';
             transcript += `[${time}] ${author}: ${content}\n`;
         });
 
         // 2. Save to temporary file
-        const tempPath = path.join(__dirname, `../../temp_purge_${channel?.id || 'unknown'}_${Date.now()}.txt`);
+        const tempPath = path.join(__dirname, `../../temp_purge_${channel.id}_${Date.now()}.txt`);
         fs.writeFileSync(tempPath, transcript);
 
         // 3. Prepare the Embed
@@ -43,13 +44,13 @@ module.exports = {
             .setTimestamp();
 
         // Attempt to find the moderator who purged
-        const entry = await fetchLatestAuditLog(guild, AuditLogEvent.MessageBulkDelete, channel?.id);
+        const entry = await fetchLatestAuditLog(guild, AuditLogEvent.MessageBulkDelete, channel.id);
         const executor = entry ? entry.executor.tag : 'Unknown / Bot';
         
         embed.addFields({ name: 'Purged By', value: executor });
 
         // 4. Send the log with attachment
-        const attachment = new AttachmentBuilder(tempPath, { name: `purge_log_${channel?.name || 'channel'}.txt` });
+        const attachment = new AttachmentBuilder(tempPath, { name: `purge_log_${channel.name}.txt` });
 
         try {
             const configFile = path.join(__dirname, '../../data/server_config.json');
