@@ -18,8 +18,11 @@ module.exports = {
             .setTimestamp();
 
         // Check if it was deleted by a moderator
-        const entry = await fetchLatestAuditLog(message.guild, AuditLogEvent.MessageDelete, message.channel.id);
-        if (entry && entry.targetId === message.author?.id) {
+        // For MESSAGE_DELETE, targetId is the author of the message
+        const entry = await fetchLatestAuditLog(message.guild, AuditLogEvent.MessageDelete, message.author?.id);
+        
+        // Ensure the audit log entry matches the channel where the message was deleted
+        if (entry && entry.extra.channel.id === message.channel.id) {
             embed.addFields({ name: 'Deleted By', value: entry.executor.tag });
         } else {
             embed.addFields({ name: 'Deleted By', value: 'Author / Unknown' });

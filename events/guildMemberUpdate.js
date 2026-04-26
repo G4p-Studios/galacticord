@@ -32,7 +32,13 @@ module.exports = {
         const removedRoles = oldMember.roles.cache.filter(role => !newMember.roles.cache.has(role.id));
 
         if (addedRoles.size > 0 || removedRoles.size > 0) {
-            const entry = await fetchLatestAuditLog(newMember.guild, AuditLogEvent.MemberRoleUpdate, newMember.id);
+            let entry = await fetchLatestAuditLog(newMember.guild, AuditLogEvent.MemberRoleUpdate, newMember.id);
+            
+            // Fallback for some bots/integrations that might trigger a general member update
+            if (!entry) {
+                entry = await fetchLatestAuditLog(newMember.guild, AuditLogEvent.MemberUpdate, newMember.id);
+            }
+
             const executor = entry ? entry.executor.tag : 'Unknown';
 
             embed.setTitle('Roles Updated')
