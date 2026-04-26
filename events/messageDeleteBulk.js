@@ -53,7 +53,7 @@ module.exports = {
         const attachment = new AttachmentBuilder(tempPath, { name: `purge_log_${channel.name}.txt` });
 
         try {
-            const configFile = path.join(__dirname, '../../data/server_config.json');
+            const configFile = path.join(__dirname, '../data/server_config.json');
             let config = {};
             if (fs.existsSync(configFile)) {
                 config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
