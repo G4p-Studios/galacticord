@@ -13,6 +13,21 @@ async function sendModLog(guild, embed) {
     await _sendToChannel(guild, embed, 'modLog') || await _sendToChannel(guild, embed, 'logChannel');
 }
 
+function verboseLog(guild, message) {
+    let config = {};
+    try {
+        if (fs.existsSync(configFile)) {
+            config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+        }
+    } catch (e) {}
+
+    const isVerbose = config[guild?.id]?.verboseLogging || process.env.VERBOSE_LOGGING === 'true';
+    if (isVerbose) {
+        const timestamp = new Date().toISOString();
+        console.log(`[VERBOSE][${timestamp}]${guild ? `[${guild.name}]` : ''} ${message}`);
+    }
+}
+
 async function _sendToChannel(guild, embed, configKey) {
     if (!guild) return false;
 
@@ -49,4 +64,4 @@ async function _sendToChannel(guild, embed, configKey) {
     }
 }
 
-module.exports = { sendLog, sendModLog };
+module.exports = { sendLog, sendModLog, verboseLog };

@@ -1,10 +1,11 @@
 const { Events, EmbedBuilder, AuditLogEvent } = require('discord.js');
-const { sendLog } = require('../utils/logger');
+const { sendLog, verboseLog } = require('../utils/logger');
 const { fetchLatestAuditLog } = require('../utils/auditLogUtil');
 
 module.exports = {
     name: Events.MessageDelete,
     async execute(message) {
+        verboseLog(message.guild, `Message delete event received for ID: ${message.id} in ${message.channel.name}`);
         if (!message.guild || message.author?.bot) return;
 
         const embed = new EmbedBuilder()

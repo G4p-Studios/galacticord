@@ -98,8 +98,18 @@ module.exports = {
                     option.setName('speak')
                         .setDescription('True to speak bot messages, False to ignore them (default).')
                         .setRequired(true)))
-        // Subcommand: Join Message
-        .addSubcommand(subcommand =>
+                // Subcommand: Verbose
+                .addSubcommand(subcommand =>
+                subcommand
+                .setName('verbose')
+                .setDescription('Toggle verbose internal logging for debugging.')
+                .addBooleanOption(option =>
+                    option.setName('enabled')
+                        .setDescription('Enable or disable verbose console logging.')
+                        .setRequired(true)))
+                // Subcommand: Voice
+                .addSubcommand(subcommand =>
+
             subcommand
                 .setName('join_message')
                 .setDescription('Set a custom voice channel join message (use {user} for the username)')
@@ -340,6 +350,18 @@ module.exports = {
             config[interaction.guild.id].ignoreBots = !speak;
             fs.writeFileSync(serverConfigFile, JSON.stringify(config, null, 2));
             await interaction.reply({ content: `✅ Bot messages will now be ${speak ? 'SPOKEN' : 'IGNORED'}.` });
+
+        } else if (subcommand === 'verbose') {
+            if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+                return interaction.reply({ content: 'You need Manage Guild permissions to use this command.', ephemeral: true });
+            }
+            const enabled = interaction.options.getBoolean('enabled');
+            let config = {};
+            try { if (fs.existsSync(serverConfigFile)) config = JSON.parse(fs.readFileSync(serverConfigFile, 'utf8')); } catch (e) {}
+            if (!config[interaction.guild.id]) config[interaction.guild.id] = {};
+            config[interaction.guild.id].verboseLogging = enabled;
+            fs.writeFileSync(serverConfigFile, JSON.stringify(config, null, 2));
+            await interaction.reply({ content: `✅ Verbose console logging has been **${enabled ? 'ENABLED' : 'DISABLED'}** for this server.` });
 
         } else if (subcommand === 'star_url') {
             const target = interaction.options.getString('target');
