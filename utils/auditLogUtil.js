@@ -1,35 +1,44 @@
 const { AuditLogEvent } = require('discord.js');
 
 /**
- * Fetches the latest audit log entry for a specific event type.
+ * Fetches the latest audit log entry for one or more event types.
  * @param {Guild} guild - The guild to fetch from.
- * @param {AuditLogEvent} actionType - The type of action to look for.
+ * @param {AuditLogEvent|AuditLogEvent[]} actionTypes - The type(s) of action to look for.
  * @param {string} [targetId] - Optional ID of the target (e.g., member ID or channel ID).
  * @returns {Promise<AuditLogEntry|null>}
  */
-async function fetchLatestAuditLog(guild, actionType, targetId = null) {
+async function fetchLatestAuditLog(guild, actionTypes, targetId = null) {
     try {
-        // We wait a moment because audit logs are sometimes delayed by a second
+        const types = Array.isArray(actionTypes) ? actionTypes : [actionTypes];
+        
+        // We wait a moment because audit logs are sometimes delayed
         await new Promise(resolve => setTimeout(resolve, 1500));
         
-        const fetchedLogs = await guild.fetchAuditLogs({
-            limit: 1,
-            type: actionType,
-        });
+        let latestEntry = null;
 
-        const entry = fetchedLogs.entries.first();
-        if (!entry) return null;
+        for (const type of types) {
+            const fetchedLogs = await guild.fetchAuditLogs({
+                limit: 1,
+                type: type,
+            });
 
-        // Check if the entry is recent (within the last 10 seconds)
-        const now = Date.now();
-        if (now - entry.createdTimestamp > 10000) return null;
+            const entry = fetchedLogs.entries.first();
+            if (entry) {
+                // If a targetId is provided, make sure it matches
+                if (targetId && entry.targetId !== targetId) continue;
 
-        // If a targetId is provided, make sure it matches
-        if (targetId && entry.targetId !== targetId) return null;
+                const now = Date.now();
+                if (now - entry.createdTimestamp < 15000) { // 15 seconds
+                    if (!latestEntry || entry.createdTimestamp > latestEntry.createdTimestamp) {
+                        latestEntry = entry;
+                    }
+                }
+            }
+        }
 
-        return entry;
+        return latestEntry;
     } catch (error) {
-        console.error(`[AuditLogUtil] Error fetching logs for ${actionType}:`, error);
+        console.error(`[AuditLogUtil] Error fetching logs for ${actionTypes}:`, error);
         return null;
     }
 }
