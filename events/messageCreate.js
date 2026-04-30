@@ -103,22 +103,19 @@ module.exports = {
 
         let connection = getVoiceConnection(message.guild.id);
 
-        // If the sender is a bot, they won't be in a VC. 
+        // If the sender is a bot, they won't be in a VC.
         // We should check if we are already in a VC, or if there's someone else we can join.
         let targetChannel = message.member?.voice?.channel;
+        const userInVC = !!targetChannel;
 
-        if (message.author.bot && !targetChannel) {
-            // If we're already connected, just use that.
-            if (connection) {
-                // Stay where we are
-            } else {
-                // If not connected, we can't really "follow" a bot. 
-                // We'll skip unless we are already there or have a specific channel to join.
-                return;
-            }
-        } else if (!targetChannel) {
-            // Non-bot but not in VC
-            return;
+        if (!targetChannel) {
+            // Sender isn't in a VC (bot or human). We can only speak the message
+            // if we're already connected to a voice channel in this guild.
+            const hasLiveConnection = connection &&
+                connection.state.status !== 'disconnected' &&
+                connection.state.status !== 'destroyed' &&
+                connection.state.status !== 'failed';
+            if (!hasLiveConnection) return;
         }
 
         // If not connected, only join if autoJoin is enabled
@@ -251,7 +248,9 @@ module.exports = {
             }
 
             // Get Resource from Provider
-            const textToSpeak = `${message.member?.displayName || message.author.username} said: ${cleanContent}`;
+            const speakerName = message.member?.displayName || message.author.username;
+            const verb = userInVC ? 'said' : 'said outside the VC';
+            const textToSpeak = `${speakerName} ${verb}: ${cleanContent}`;
             const stream = await getAudioStream(textToSpeak, mode, voiceKey);
 
             // Add to the shared queue
