@@ -184,7 +184,7 @@ async function getAudioStream(text, provider, voiceKey) {
     const ssmlTags = ['<speak', '<prosody', '<break', '<say-as', '<phoneme', '<emphasis', '<p>', '<s>', '<sub', '<mark', '<audio', '<amazon:'];
     const isSSML = ssmlTags.some(tag => sanitizedText.toLowerCase().includes(tag));
     let finalText = sanitizedText;
-    if (isSSML && !finalText.toLowerCase().trim().startsWith('<speak>')) {
+    if (isSSML && !finalText.toLowerCase().trim().startsWith('<speak>') && !finalText.toLowerCase().trim().startsWith('<amazon:')) {
         finalText = `<speak>${finalText}</speak>`;
     }
 
