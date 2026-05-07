@@ -98,60 +98,68 @@ function resolvePath(command) {
 }
 
 async function getStarAudioStream(text, url, voice) {
-    return new Promise((resolve, reject) => {
-        const wsUrl = url.replace(/^http/, 'ws');
-        const ws = new WebSocket(wsUrl);
-        const timeout = setTimeout(() => {
-            ws.terminate();
-            reject(new Error("STAR WebSocket timed out (10s)"));
-        }, 10000);
+    const { PassThrough } = require('stream');
+    const stream = new PassThrough();
+    
+    const wsUrl = url.replace(/^http/, 'ws');
+    const ws = new WebSocket(wsUrl);
+    
+    let hasSentResolve = false;
 
-        ws.on('open', () => {
-            console.log(`[STAR Debug] Connected to ${wsUrl}. Requesting voice: ${voice}`);
-            // STAR Protocol: {"user": 4, "request": ["Voice: Text"]}
-            const payload = {
-                user: 4, // Updated to revision 4 as required by server
-                request: [`${voice}: ${text}`]
-            };
-            ws.send(JSON.stringify(payload));
-        });
+    const timeout = setTimeout(() => {
+        ws.terminate();
+        if (!hasSentResolve) {
+            stream.destroy(new Error("STAR WebSocket timed out (10s)"));
+        }
+    }, 10000);
 
-        ws.on('message', (data, isBinary) => {
-            if (isBinary) {
-                clearTimeout(timeout);
-                try {
-                    // Protocol: 2 byte little-endian length + metadata/ID + audio
-                    const idLen = data.readUInt16LE(0);
-                    const audioData = data.subarray(2 + idLen);
-                    
-                    console.log(`[STAR Debug] Received audio binary: ${audioData.length} bytes`);
-                    resolve(Readable.from(audioData));
-                    ws.close();
-                } catch (e) {
-                    reject(new Error(`Failed to parse STAR audio packet: ${e.message}`));
-                    ws.close();
-                }
-            } else {
-                const textMsg = data.toString();
-                console.log(`[STAR Debug] Server sent text: "${textMsg}"`);
-                // Check if the text message looks like an error
-                if (textMsg.toLowerCase().includes('error') || textMsg.toLowerCase().includes('not found')) {
-                    clearTimeout(timeout);
-                    reject(new Error(`STAR Server Error: ${textMsg}`));
-                    ws.close();
-                }
-            }
-        });
-
-        ws.on('error', (err) => {
-            clearTimeout(timeout);
-            reject(new Error(`STAR WebSocket Error: ${err.message}`));
-        });
-
-        ws.on('close', () => {
-            clearTimeout(timeout);
-        });
+    ws.on('open', () => {
+        console.log(`[STAR Debug] Connected to ${wsUrl}. Streaming voice: ${voice}`);
+        // STAR Protocol: {"user": 4, "request": ["Voice: Text"]}
+        const payload = {
+            user: 4, 
+            request: [`${voice}: ${text}`]
+        };
+        ws.send(JSON.stringify(payload));
     });
+
+    ws.on('message', (data, isBinary) => {
+        if (isBinary) {
+            clearTimeout(timeout);
+            try {
+                // Protocol: 2 byte little-endian length + metadata/ID + audio
+                const idLen = data.readUInt16LE(0);
+                const audioData = data.subarray(2 + idLen);
+                
+                // Write the chunk to the stream immediately
+                stream.write(audioData);
+                
+                if (!hasSentResolve) {
+                    hasSentResolve = true;
+                }
+            } catch (e) {
+                console.error(`[STAR Debug] Packet Error: ${e.message}`);
+            }
+        } else {
+            const textMsg = data.toString();
+            // End of stream marker usually looks like {"status": "done"} or similar
+            if (textMsg.includes('"status"') || textMsg.includes('"done"')) {
+                stream.end();
+                ws.close();
+            }
+        }
+    });
+
+    ws.on('error', (err) => {
+        clearTimeout(timeout);
+        stream.destroy(err);
+    });
+
+    ws.on('close', () => {
+        stream.end();
+    });
+
+    return stream;
 }
 
 /**
