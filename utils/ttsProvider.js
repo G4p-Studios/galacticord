@@ -87,11 +87,11 @@ function resolvePath(command) {
 /**
  * Normalizes any audio stream/buffer to s16le stereo 48k PCM for Discord.
  * @param {Readable|Buffer} input - The input audio
- * @param {string[]} [extraArgs] - Extra input arguments (e.g. ['-f', 's16le', '-ar', '24000'])
+ * @param {string[]} [extraInputArgs] - Extra input arguments (e.g. ['-f', 's16le', '-ar', '24000'])
  */
-function normalizeToPcm(input, extraArgs = []) {
+function normalizeToPcm(input, extraInputArgs = []) {
     const ffmpeg = spawn('ffmpeg', [
-        ...extraArgs,
+        ...extraInputArgs,
         '-i', 'pipe:0',
         '-f', 's16le',
         '-ar', '48000',
@@ -143,14 +143,15 @@ async function getStarAudioStream(text, url, voice) {
         if (isBinary) {
             clearTimeout(timeout);
             try {
-                // Skip the ID header (2 bytes length + data)
+                // Protocol: 2 byte little-endian length + metadata/ID + audio
                 const idLen = data.readUInt16LE(0);
                 const audioData = data.subarray(2 + idLen);
                 if (output.writable) output.write(audioData);
             } catch (e) { console.error(`[STAR Debug] Packet Error: ${e.message}`); }
         } else {
             const msg = data.toString();
-            if (msg.includes('"status"') || msg.includes('"done"')) {
+            // Server indicating completion or error
+            if (msg.includes('"status"') || msg.includes('"done"') || msg.includes('"abort":true')) {
                 output.end();
                 ws.close();
             }
@@ -215,7 +216,8 @@ async function getAudioStream(text, provider, voiceKey) {
                 voice: { name: voice, languageCode: langCode },
                 audioConfig: { audioEncoding: 'LINEAR16', sampleRateHertz: 48000 },
             });
-            return normalizeToPcm(response.audioContent);
+            // Google Cloud returns raw s16le PCM at requested sample rate
+            return normalizeToPcm(response.audioContent, ['-f', 's16le', '-ar', '48000', '-ac', '1']);
 
         } else if (cleanProvider === 'polly') {
             const pollyClient = new PollyClient({ region: process.env.AWS_REGION || "us-east-1" });
@@ -232,6 +234,7 @@ async function getAudioStream(text, provider, voiceKey) {
             }));
             
             const audioArray = await response.AudioStream.transformToByteArray();
+            // Polly returns MP3. FFmpeg auto-detects MP3.
             return normalizeToPcm(Buffer.from(audioArray));
 
         } else if (cleanProvider === 'gemini') {
@@ -244,23 +247,26 @@ async function getAudioStream(text, provider, voiceKey) {
             const audioPart = result.response.candidates[0].content.parts.find(p => p.inlineData && p.inlineData.mimeType.startsWith("audio/"));
             const buffer = Buffer.from(audioPart.inlineData.data, 'base64');
             
-            // Gemini usually returns 24k mono PCM
-            const inputArgs = (audioPart.inlineData.mimeType.includes('pcm')) ? ['-f', 's16le', '-ar', '24000', '-ac', '1'] : [];
-            return normalizeToPcm(buffer, inputArgs);
+            // Gemini usually returns 24k mono PCM (sometimes wrapped in container). 
+            // We'll let FFmpeg attempt auto-detect first, then force if needed.
+            return normalizeToPcm(buffer);
 
         } else if (cleanProvider === 'piper') {
             const modelPath = path.isAbsolute(cleanVoiceKey) ? cleanVoiceKey : path.resolve(__dirname, '..', cleanVoiceKey);
             const piper = spawn(resolvePath('piper'), ['--model', modelPath, '--output_file', '-']);
             piper.stdin.write(sanitizedText + '\n');
             piper.stdin.end();
+            // Piper returns raw WAV to stdout.
             return normalizeToPcm(piper.stdout);
 
         } else if (cleanProvider === 'espeak') {
             const child = exec(`printf "${sanitizedText.replace(/"/g, '\"')}" | "${resolvePath('espeak-ng')}" -v ${cleanVoiceKey || 'en-us'} --stdout`, { encoding: 'buffer' });
+            // espeak-ng --stdout returns WAV.
             return normalizeToPcm(child.stdout);
 
         } else if (cleanProvider === 'rhvoice') {
             const child = exec(`printf "${sanitizedText.replace(/"/g, '\"')}" | "${resolvePath('RHVoice-test')}" -p ${cleanVoiceKey || 'alan'} -o -`, { encoding: 'buffer' });
+            // RHVoice-test returns WAV.
             return normalizeToPcm(child.stdout);
 
         } else if (cleanProvider === 'star') {
@@ -273,8 +279,9 @@ async function getAudioStream(text, provider, voiceKey) {
             } catch (e) {}
 
             const starStream = await getStarAudioStream(sanitizedText, url, voice);
-            // STAR revision 4 usually returns 24k mono PCM
-            return normalizeToPcm(starStream, ['-f', 's16le', '-ar', '24000', '-ac', '1']);
+            // RESEARCH: STAR returns WAV files with headers. 
+            // DO NOT force input format. Let FFmpeg parse the WAV header.
+            return normalizeToPcm(starStream);
         }
         throw new Error("Unknown provider");
     } catch (e) { console.error(`[TTS Provider] Error in ${cleanProvider}: ${e.message}`); throw e; }
