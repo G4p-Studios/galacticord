@@ -92,6 +92,7 @@ function normalizeToPcm(input, extraInputArgs = []) {
     outputStream.on('error', () => {});
 
     const ffmpeg = spawn('ffmpeg', [
+        '-fflags', 'nobuffer',
         ...extraInputArgs,
         '-i', 'pipe:0',
         '-f', 's16le',
@@ -100,33 +101,21 @@ function normalizeToPcm(input, extraInputArgs = []) {
         'pipe:1'
     ]);
 
-    // Error handling to prevent crashes
-    ffmpeg.stdin.on('error', (e) => console.log(`[FFmpeg stdin] Error: ${e.message}`));
-    ffmpeg.stdout.on('error', (e) => console.log(`[FFmpeg stdout] Error: ${e.message}`));
-    ffmpeg.on('error', (e) => console.error(`[FFmpeg Process] Failed to start: ${e.message}`));
+    ffmpeg.stdin.on('error', (e) => {});
+    ffmpeg.stdout.on('error', (e) => {});
+    ffmpeg.on('error', (e) => console.error(`[FFmpeg Process] Failed: ${e.message}`));
 
-    // Monitor for actual data production
-    let hasProducedData = false;
     ffmpeg.stdout.on('data', (chunk) => {
-        if (!hasProducedData) {
-            console.log(`[FFmpeg] First audio chunk produced (${chunk.length} bytes)`);
-            hasProducedData = true;
-        }
-        outputStream.write(chunk);
+        if (outputStream.writable) outputStream.write(chunk);
     });
 
     ffmpeg.stdout.on('end', () => {
-        console.log(`[FFmpeg] Stream ended.`);
         outputStream.end();
     });
 
-    // Capture stderr for debugging
-    let lastError = '';
     ffmpeg.stderr.on('data', (data) => {
-        lastError = data.toString().trim();
-        if (lastError.includes('Error') || lastError.includes('Invalid')) {
-            console.log(`[FFmpeg Debug] ${lastError}`);
-        }
+        const msg = data.toString();
+        if (msg.includes('Error')) console.log(`[FFmpeg Error] ${msg.trim()}`);
     });
 
     if (Buffer.isBuffer(input)) {
@@ -134,10 +123,7 @@ function normalizeToPcm(input, extraInputArgs = []) {
         ffmpeg.stdin.end();
     } else if (input && typeof input.pipe === 'function') {
         input.pipe(ffmpeg.stdin);
-        input.on('error', (e) => {
-            console.error(`[Input Stream Error] ${e.message}`);
-            ffmpeg.stdin.end();
-        });
+        input.on('error', (e) => ffmpeg.stdin.end());
         input.on('end', () => ffmpeg.stdin.end());
     }
 
@@ -151,35 +137,43 @@ async function getStarAudioStream(text, url, voice) {
     const wsUrl = url.replace(/^http/, 'ws');
     const ws = new WebSocket(wsUrl);
     
-    let isFinished = false;
+    let inactivityTimer = null;
 
-    const timeout = setTimeout(() => {
-        if (!isFinished) {
-            console.log(`[STAR] Closing connection due to timeout.`);
-            ws.terminate();
+    const resetInactivityTimer = () => {
+        if (inactivityTimer) clearTimeout(inactivityTimer);
+        inactivityTimer = setTimeout(() => {
+            console.log(`[STAR] Stream inactive for 2s. Finalizing.`);
             output.end();
-        }
+            ws.close();
+        }, 2000);
+    };
+
+    const safetyTimeout = setTimeout(() => {
+        console.log(`[STAR] Safety timeout (15s). Closing.`);
+        output.end();
+        ws.terminate();
     }, 15000);
 
     ws.on('open', () => {
-        console.log(`[STAR WS] Connected to ${wsUrl}. Requesting: ${voice}`);
+        console.log(`[STAR WS] Connected to ${wsUrl}. Streaming: ${voice}`);
         ws.send(JSON.stringify({ user: 4, request: [`${voice}: ${text}`] }));
+        resetInactivityTimer();
     });
 
     ws.on('message', (data, isBinary) => {
+        resetInactivityTimer();
         if (isBinary) {
             try {
-                // Header: 2 bytes length + metadata string
                 const idLen = data.readUInt16LE(0);
                 const audioData = data.subarray(2 + idLen);
                 if (output.writable) output.write(audioData);
             } catch (e) { console.error(`[STAR Debug] Packet Error: ${e.message}`); }
         } else {
             const msg = data.toString();
-            // End markers
+            console.log(`[STAR Text] ${msg}`); // Log all text markers for debugging
             if (msg.includes('"status"') || msg.includes('"done"') || msg.includes('"abort":true')) {
-                console.log(`[STAR WS] Server finished sending.`);
-                isFinished = true;
+                console.log(`[STAR WS] Server marked as finished.`);
+                clearTimeout(inactivityTimer);
                 output.end();
                 ws.close();
             }
@@ -192,7 +186,8 @@ async function getStarAudioStream(text, url, voice) {
     });
 
     ws.on('close', () => {
-        clearTimeout(timeout);
+        clearTimeout(safetyTimeout);
+        if (inactivityTimer) clearTimeout(inactivityTimer);
         output.end();
     });
 
