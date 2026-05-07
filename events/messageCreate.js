@@ -2,229 +2,151 @@ const { Events } = require('discord.js');
 const { getVoiceConnection, joinVoiceChannel } = require('@discordjs/voice');
 const fs = require('fs');
 const path = require('path');
-const { getAudioStream } = require('../utils/ttsProvider');
+const { getAudioResource, getAudioStream } = require('../utils/ttsProvider');
 const { addToQueue } = require('../utils/audioQueue');
+const axios = require('axios');
+const cheerio = require('cheerio');
 
 const settingsFile = path.join(__dirname, '../data/tts_settings.json');
 const configFile = path.join(__dirname, '../data/server_config.json');
 
+/**
+ * Enhanced Link Metadata Extractor
+ * Designed for accessibility and descriptive TTS.
+ */
+async function getLinkDescription(url) {
+    try {
+        const urlObj = new URL(url);
+        const domain = urlObj.hostname.replace('www.', '');
+
+        // 1. YouTube Specialized Handling
+        if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
+            try {
+                const response = await axios.get(url, { timeout: 3000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+                const $ = cheerio.load(response.data);
+                const title = $('meta[name="title"]').attr('content') || $('title').text();
+                if (title) return `a YouTube video titled ${title}`;
+            } catch (e) {}
+            return `a YouTube video`;
+        }
+
+        // 2. Twitter / X Specialized Handling
+        if (domain.includes('twitter.com') || domain.includes('x.com')) {
+            try {
+                // We use fixup URLs for better metadata if possible
+                const fixupUrl = url.replace('twitter.com', 'fxtwitter.com').replace('x.com', 'fixupx.com');
+                const response = await axios.get(fixupUrl, { timeout: 3000 });
+                const $ = cheerio.load(response.data);
+                const desc = $('meta[property="og:description"]').attr('content');
+                const author = $('meta[property="og:title"]').attr('content');
+                if (author && desc) return `a post by ${author} saying: ${desc}`;
+                if (desc) return `a post saying: ${desc}`;
+            } catch (e) {}
+            return `a post on ${domain.split('.')[0]}`;
+        }
+
+        // 3. Generic Meta Scraping
+        try {
+            const response = await axios.get(url, { 
+                timeout: 3000, 
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Galacticord/1.0' } 
+            });
+            const $ = cheerio.load(response.data);
+            
+            const ogTitle = $('meta[property="og:title"]').attr('content');
+            const ogSite = $('meta[property="og:site_name"]').attr('content');
+            const metaDesc = $('meta[name="description"]').attr('content') || $('meta[property="og:description"]').attr('content');
+
+            if (ogTitle && ogSite) return `${ogTitle} on ${ogSite}`;
+            if (ogTitle) return `${ogTitle} on ${domain}`;
+            if (metaDesc) return `a website about ${metaDesc.substring(0, 60)}...`;
+        } catch (e) {}
+
+        return `a link to ${domain}`;
+    } catch (e) {
+        return "a link";
+    }
+}
+
 module.exports = {
     name: Events.MessageCreate,
     async execute(message) {
-        // We keep this one for basic entry check
-        // console.log(`[MessageCreate Debug] Received message from ${message.author.tag} in #${message.channel.name}`);
-        
         if (!message.guild) return;
 
-        // Prefix command handling (Only for non-bots)
-        const prefix = 'mal!';
-        if (!message.author.bot && message.content.startsWith(prefix)) {
-            const args = message.content.slice(prefix.length).trim().split(/ +/);
-            const commandName = args.shift().toLowerCase();
-
-            if (commandName === 'ping') {
-                const start = Date.now();
-                const sent = await message.reply('Pinging...');
-                const end = Date.now();
-                const latency = end - start;
-                return sent.edit(`Pong! Latency: ${latency}ms (API Latency: ${Math.round(message.client.ws.ping)}ms)`);
-            }
-
-            if (commandName === 'help') {
-                const helpText = `**Galacticord Help (mal! prefix)**\n` +
-                    `- \`mal!ping\`: Check bot latency.\n` +
-                    `- \`mal!help\`: Show this help message.\n\n` +
-                    `**Owner Only Commands:**\n` +
-                    `- \`mal!serverslist\`: List all servers the bot is in.\n` +
-                    `- \`mal!shutdown\`: Power off the bot.\n` +
-                    `- \`mal!restart\`: Restart the bot.\n` +
-                    `- \`mal!freshpull\`: Pull the latest code from GitHub.`;
-                return message.reply(helpText);
-            }
-
-            // Owner Only Commands
-            const ownerId = '1365401272798281850';
-            if (message.author.id === ownerId) {
-                if (commandName === 'serverslist') {
-                    const guilds = message.client.guilds.cache.map(g => `${g.name} (${g.id})`).join('\n');
-                    return message.reply(`**Servers List:**\n${guilds || 'No servers found.'}`);
-                }
-
-                if (commandName === 'shutdown') {
-                    await message.reply('Shutting down...');
-                    process.exit();
-                }
-
-                if (commandName === 'restart') {
-                    await message.reply('Restarting...');
-                    // In a production environment with PM2 or a similar process manager, 
-                    // exiting will trigger an automatic restart.
-                    process.exit();
-                }
-
-                if (commandName === 'freshpull') {
-                    await message.reply('Pulling latest updates from GitHub...');
-                    const { exec } = require('child_process');
-                    exec('git pull origin main', (err, stdout, stderr) => {
-                        if (err) return message.reply(`Error: ${err.message}`);
-                        message.reply(`**Git Pull Success:**\n\`\`\`\n${stdout}\`\`\``);
-                    });
-                }
-            }
-        }
-
-        // Load Server Config
-        let config = {};
         try {
-            if (fs.existsSync(configFile)) {
-                config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-            }
-        } catch (e) {
-             // If config is broken, we can't proceed.
-             return console.error(`[FATAL] Could not parse server_config.json: ${e.message}`);
-        }
-
-        const serverConfig = config[message.guild.id] || {};
-
-        // Bot Ignore Logic
-        const ignoreBots = serverConfig.ignoreBots !== false; // Default to true if not set
-        if (message.author.bot && ignoreBots) {
-            return; // Silently ignore
-        }
-
-        const ttsChannelId = serverConfig.ttsChannel;
-        const autoJoin = serverConfig.autoJoin || false;
-        
-        // Check if message is in TTS Channel OR in the user's current Voice Chat
-        const isTTSChannel = ttsChannelId && message.channel.id === ttsChannelId;
-        const isVoiceChat = message.member?.voice?.channel && message.channel.id === message.member.voice.channel.id;
-
-        if (!isTTSChannel && !isVoiceChat) return; 
-
-        let connection = getVoiceConnection(message.guild.id);
-
-        // If the sender is a bot, they won't be in a VC.
-        // We should check if we are already in a VC, or if there's someone else we can join.
-        let targetChannel = message.member?.voice?.channel;
-        const userInVC = !!targetChannel;
-
-        if (!targetChannel) {
-            // Sender isn't in a VC (bot or human). We can only speak the message
-            // if we're already connected to a voice channel in this guild.
-            const hasLiveConnection = connection &&
-                connection.state.status !== 'disconnected' &&
-                connection.state.status !== 'destroyed' &&
-                connection.state.status !== 'failed';
-            if (!hasLiveConnection) return;
-        }
-
-        // If not connected, only join if autoJoin is enabled
-        if (!connection && targetChannel) {
-            if (autoJoin) {
-                try {
-                    connection = joinVoiceChannel({
-                        channelId: targetChannel.id,
-                        guildId: message.guild.id,
-                        adapterCreator: message.guild.voiceAdapterCreator,
-                        daveEncryption: true,
-                    });
-                    console.log(`[AutoJoin] Automatically joined VC: ${targetChannel.name} for user: ${message.author.tag}`);
-                    
-                    connection.on('stateChange', (oldState, newState) => {
-                        console.log(`[VoiceConnection AutoJoin] State changed from ${oldState.status} to ${newState.status}`);
-                    });
-        
-                    connection.on('error', (error) => {
-                        console.error(`[VoiceConnection AutoJoin Error] ${error.message}`);
-                    });
-                } catch (error) {
-                    console.error("Failed to auto-join VC:", error);
-                    return;
+            // Load Server Config
+            let config = {};
+            try {
+                if (fs.existsSync(configFile)) {
+                    config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
                 }
-            } else {
-                return;
-            }
-        }
+            } catch (e) {}
 
-        try {
-            // Determine Settings
+            const serverConfig = config[message.guild.id] || {};
+            const ttsChannelId = serverConfig.ttsChannel;
+            const ignoreBots = serverConfig.ignoreBots !== undefined ? serverConfig.ignoreBots : true;
+
+            // Basic filters
+            if (ignoreBots && message.author.bot) return;
+            if (ttsChannelId && message.channel.id !== ttsChannelId) return;
+            if (message.content.startsWith('!')) return; // Ignore prefixed commands
+
+            // Check if user is in a voice channel
+            const voiceChannel = message.member?.voice.channel;
+            if (!voiceChannel) return;
+
+            // Handle Auto-Join
+            let connection = getVoiceConnection(message.guild.id);
+            if (!connection) {
+                const autoJoinEnabled = serverConfig.autoJoin !== undefined ? serverConfig.autoJoin : true;
+                if (!autoJoinEnabled) return;
+
+                connection = joinVoiceChannel({
+                    channelId: voiceChannel.id,
+                    guildId: message.guild.id,
+                    adapterCreator: message.guild.voiceAdapterCreator,
+                    daveEncryption: true,
+                });
+            }
+
+            // Load Settings (Provider/Voice)
             let settings = { users: {}, servers: {} };
             try {
                 if (fs.existsSync(settingsFile)) {
                     settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
                 }
-            } catch (e) {
-                console.error(`[MessageCreate Debug] Error reading TTS settings file: ${e.message}`);
-            }
+            } catch (e) {}
 
             const userSetting = settings.users[message.author.id];
             const serverSetting = settings.servers[message.guild.id];
 
-            const getProp = (setting, prop) => {
-                if (!setting) return null;
-                if (typeof setting === 'string' && prop === 'voice') return setting;
-                if (typeof setting === 'object') return setting[prop];
-                return null;
-            };
+            const mode = userSetting?.mode || serverSetting?.mode || 'piper';
+            let voiceKey = userSetting?.voice || serverSetting?.voice;
 
-            const userMode = getProp(userSetting, 'mode');
-            const serverMode = getProp(serverSetting, 'mode');
-            const mode = userMode || serverMode || 'piper';
+            if (!voiceKey) {
+                voiceKey = mode === 'piper' ? 'models/en_US-amy-medium.onnx' : 'en-US';
+            }
 
-            const userVoice = getProp(userSetting, 'voice');
-            const serverVoice = getProp(serverSetting, 'voice');
-            
-            let defaultVoice = 'en-US';
-            if (mode === 'piper') defaultVoice = 'models/en_US-amy-medium.onnx';
-
-            let voiceKey = userVoice || serverVoice || defaultVoice;
-
-            // SPECIAL HANDLING FOR STAR
             if (mode === 'star') {
                 const defaultStarUrl = 'https://speech.seedy.cc';
                 const starUrl = userSetting?.starUrl || serverSetting?.starUrl || defaultStarUrl;
-                
-                // Pack URL and Voice into the key for ttsProvider to unpack
                 voiceKey = JSON.stringify({
                     url: starUrl,
                     voice: voiceKey
                 });
             }
 
-            console.log(`[MessageCreate Debug] Determined Mode: ${mode}, VoiceKey: ${mode === 'star' ? '(Hidden JSON)' : voiceKey}`);
+            let cleanContent = message.content;
 
-            // --- Link Preview / URL Cleaning Logic ---
-            // We wait a moment because Discord takes 1-2 seconds to generate embeds (link previews)
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            // Fetch the message again to get updated embeds
-            const updatedMessage = await message.channel.messages.fetch(message.id).catch(() => message);
-
-            let cleanContent = updatedMessage.content;
-            
-            // Regex to find URLs
+            // --- Enhanced Link Preview Logic ---
             const urlRegex = /(https?:\/\/[^\s]+)/g;
             const urls = cleanContent.match(urlRegex);
 
             if (urls) {
                 for (const url of urls) {
-                    let replacement = "a link";
-                    try {
-                        const urlObj = new URL(url);
-                        const domain = urlObj.hostname.replace('www.', '');
-                        
-                        // Check if Discord generated an embed for this URL
-                        const embed = updatedMessage.embeds.find(e => e.url === url || (e.data && e.data.url === url));
-                        
-                        if (embed && (embed.title || embed.description)) {
-                            const title = embed.title || (embed.description ? embed.description.substring(0, 50) + "..." : "");
-                            replacement = `a link to ${title} on ${domain}`;
-                        } else {
-                            replacement = `a link to ${domain}`;
-                        }
-                    } catch (e) {
-                        replacement = "a link";
-                    }
-                    cleanContent = cleanContent.replace(url, replacement);
+                    // Try to get a high-quality description first
+                    const description = await getLinkDescription(url);
+                    cleanContent = cleanContent.replace(url, description);
                 }
             }
 
@@ -247,11 +169,13 @@ module.exports = {
                 cleanContent = cleanContent.replace(match[0], replacement);
             }
 
-            // Get Resource from Provider
-            const speakerName = message.member?.displayName || message.author.username;
-            const verb = userInVC ? 'said' : 'said outside the VC';
-            const textToSpeak = `${speakerName} ${verb}: ${cleanContent}`;
-            const stream = await getAudioStream(textToSpeak, mode, voiceKey);
+            // Final text safety check
+            if (!cleanContent.trim()) return;
+
+            const ttsPrefix = message.member.displayName;
+            const fullText = `${ttsPrefix} says: ${cleanContent}`;
+
+            const stream = await getAudioStream(fullText, mode, voiceKey);
 
             // Add to the shared queue
             addToQueue(message.guild.id, stream, connection);
