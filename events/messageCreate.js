@@ -22,11 +22,21 @@ async function getLinkDescription(url) {
         // 1. YouTube Specialized Handling
         if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
             try {
-                const response = await axios.get(url, { timeout: 3000, headers: { 'User-Agent': 'Mozilla/5.0' } });
-                const $ = cheerio.load(response.data);
-                const title = $('meta[name="title"]').attr('content') || $('title').text();
-                if (title) return `a YouTube video titled ${title}`;
-            } catch (e) {}
+                // Use YouTube's official oEmbed API for reliable titles without scraping blocks
+                const oEmbedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+                const response = await axios.get(oEmbedUrl, { timeout: 3000 });
+                if (response.data && response.data.title) {
+                    return `a YouTube video titled ${response.data.title}`;
+                }
+            } catch (e) {
+                // Fallback to basic scraping if oEmbed fails
+                try {
+                    const response = await axios.get(url, { timeout: 2000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+                    const $ = cheerio.load(response.data);
+                    const title = $('meta[property="og:title"]').attr('content') || $('title').text();
+                    if (title) return `a YouTube video titled ${title}`;
+                } catch (err) {}
+            }
             return `a YouTube video`;
         }
 
