@@ -86,9 +86,12 @@ function resolvePath(command) {
 
 /**
  * Normalizes any audio stream/buffer to s16le stereo 48k PCM for Discord.
+ * @param {Readable|Buffer} input - The input audio
+ * @param {string[]} [extraArgs] - Extra input arguments (e.g. ['-f', 's16le', '-ar', '24000'])
  */
-function normalizeToPcm(input) {
+function normalizeToPcm(input, extraArgs = []) {
     const ffmpeg = spawn('ffmpeg', [
+        ...extraArgs,
         '-i', 'pipe:0',
         '-f', 's16le',
         '-ar', '48000',
@@ -99,21 +102,30 @@ function normalizeToPcm(input) {
     // Handle standard stream errors to prevent crashes
     ffmpeg.stdin.on('error', () => {});
     ffmpeg.stdout.on('error', () => {});
-    ffmpeg.stderr.on('error', () => {});
-    ffmpeg.on('error', () => {});
+    ffmpeg.stderr.on('data', () => {}); // Consume stderr to prevent buffer fill
+    ffmpeg.on('error', (err) => console.error(`[FFmpeg Spawn Error] ${err.message}`));
 
     if (Buffer.isBuffer(input)) {
         ffmpeg.stdin.write(input);
         ffmpeg.stdin.end();
     } else if (input && typeof input.pipe === 'function') {
+        input.on('error', (err) => {
+            console.error(`[NormalizeStream] Input Stream Error: ${err.message}`);
+            ffmpeg.stdin.end();
+        });
         input.pipe(ffmpeg.stdin);
     }
 
-    return ffmpeg.stdout;
+    // Return a stream that won't crash if it emits an error
+    const safeOutput = ffmpeg.stdout;
+    safeOutput.on('error', () => {}); 
+    return safeOutput;
 }
 
 async function getStarAudioStream(text, url, voice) {
     const output = new PassThrough();
+    output.on('error', () => {}); // Prevent unhandled error crashes
+
     const wsUrl = url.replace(/^http/, 'ws');
     const ws = new WebSocket(wsUrl);
     
@@ -131,18 +143,30 @@ async function getStarAudioStream(text, url, voice) {
         if (isBinary) {
             clearTimeout(timeout);
             try {
+                // Skip the ID header (2 bytes length + data)
                 const idLen = data.readUInt16LE(0);
                 const audioData = data.subarray(2 + idLen);
-                output.write(audioData);
+                if (output.writable) output.write(audioData);
             } catch (e) { console.error(`[STAR Debug] Packet Error: ${e.message}`); }
-        } else if (data.toString().includes('"status"') || data.toString().includes('"done"')) {
-            output.end();
-            ws.close();
+        } else {
+            const msg = data.toString();
+            if (msg.includes('"status"') || msg.includes('"done"')) {
+                output.end();
+                ws.close();
+            }
         }
     });
 
-    ws.on('error', (err) => { clearTimeout(timeout); output.destroy(err); });
-    ws.on('close', () => output.end());
+    ws.on('error', (err) => { 
+        clearTimeout(timeout); 
+        console.error(`[STAR WS Error] ${err.message}`);
+        output.destroy(err); 
+    });
+
+    ws.on('close', () => {
+        clearTimeout(timeout);
+        output.end();
+    });
 
     return output;
 }
@@ -222,10 +246,7 @@ async function getAudioStream(text, provider, voiceKey) {
             
             // Gemini usually returns 24k mono PCM
             const inputArgs = (audioPart.inlineData.mimeType.includes('pcm')) ? ['-f', 's16le', '-ar', '24000', '-ac', '1'] : [];
-            const ffmpeg = spawn('ffmpeg', [...inputArgs, '-i', 'pipe:0', '-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1']);
-            ffmpeg.stdin.write(buffer);
-            ffmpeg.stdin.end();
-            return ffmpeg.stdout;
+            return normalizeToPcm(buffer, inputArgs);
 
         } else if (cleanProvider === 'piper') {
             const modelPath = path.isAbsolute(cleanVoiceKey) ? cleanVoiceKey : path.resolve(__dirname, '..', cleanVoiceKey);
@@ -243,12 +264,20 @@ async function getAudioStream(text, provider, voiceKey) {
             return normalizeToPcm(child.stdout);
 
         } else if (cleanProvider === 'star') {
-            const config = JSON.parse(voiceKey);
-            const starStream = await getStarAudioStream(sanitizedText, config.url, config.voice || 'default');
-            return normalizeToPcm(starStream);
+            let url = "https://speech.seedy.cc";
+            let voice = "default";
+            try {
+                const config = JSON.parse(voiceKey);
+                url = config.url;
+                voice = config.voice || 'default';
+            } catch (e) {}
+
+            const starStream = await getStarAudioStream(sanitizedText, url, voice);
+            // STAR revision 4 usually returns 24k mono PCM
+            return normalizeToPcm(starStream, ['-f', 's16le', '-ar', '24000', '-ac', '1']);
         }
         throw new Error("Unknown provider");
-    } catch (e) { console.error(`[TTS Provider] ${e.message}`); throw e; }
+    } catch (e) { console.error(`[TTS Provider] Error in ${cleanProvider}: ${e.message}`); throw e; }
 }
 
 async function getAudioResource(text, provider, voiceKey) {
