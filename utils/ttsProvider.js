@@ -28,7 +28,7 @@ async function init() {
                     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
                 }
             });
-            
+
             let voices = [];
             let nextToken = undefined;
             do {
@@ -43,7 +43,7 @@ async function init() {
                 for (const key in voiceOptions) {
                     if (voiceOptions[key] && voiceOptions[key].polly) delete voiceOptions[key];
                 }
-                
+
                 for (const voice of voices) {
                     if (!voice.SupportedEngines) continue;
                     for (const engine of voice.SupportedEngines) {
@@ -61,7 +61,6 @@ async function init() {
         console.error("[Amazon Polly] Failed to fetch voices dynamically:", e.message);
     }
 }
-
 function getEdgeVoices() { return []; }
 
 function ultimateClean(str) {
@@ -80,17 +79,14 @@ function resolvePath(command) {
             const p = path.join(dir, cmd);
             if (fs.existsSync(p)) return p;
         }
-        return cmd; 
+        return cmd;
     }
 }
 
 /**
  * Normalizes any audio stream/buffer to s16le stereo 48k PCM for Discord.
  */
-function normalizeToPcm(input, extraInputArgs = []) {
-    const outputStream = new PassThrough();
-    outputStream.on('error', () => {});
-
+function normalizeStream(stream) {
     const ffmpeg = spawn('ffmpeg', [
         '-i', 'pipe:0',
         '-f', 's16le',
@@ -98,76 +94,74 @@ function normalizeToPcm(input, extraInputArgs = []) {
         '-ac', '2',
         'pipe:1'
     ]);
+    stream.pipe(ffmpeg.stdin);
+    
+    // Safety
+    stream.on('error', () => ffmpeg.stdin.end());
+    ffmpeg.stdin.on('error', () => {});
+    ffmpeg.stdout.on('error', () => {});
+    ffmpeg.on('error', () => {});
 
-    ffmpeg.stdin.on('error', (e) => {});
-    ffmpeg.stdout.on('error', (e) => {});
-    ffmpeg.on('error', (e) => console.error(`[FFmpeg Process] Failed: ${e.message}`));
-
-    ffmpeg.stdout.on('data', (chunk) => {
-        if (outputStream.writable) outputStream.write(chunk);
-    });
-
-    ffmpeg.stdout.on('end', () => {
-        outputStream.end();
-    });
-
-    ffmpeg.stderr.on('data', (data) => {
-        const msg = data.toString();
-        if (msg.includes('Error')) console.log(`[FFmpeg Error] ${msg.trim()}`);
-    });
-
-    if (Buffer.isBuffer(input)) {
-        ffmpeg.stdin.write(input);
-        ffmpeg.stdin.end();
-    } else if (input && typeof input.pipe === 'function') {
-        input.pipe(ffmpeg.stdin);
-        input.on('error', (e) => ffmpeg.stdin.end());
-        input.on('end', () => ffmpeg.stdin.end());
-    }
-
-    return outputStream;
+    return ffmpeg.stdout;
 }
 
-/**
- * Reverted back to HTTP/HTTPS for STAR as requested.
- */
 async function getStarAudioStream(text, url, voice) {
-    console.log(`[STAR HTTP] Connecting to ${url}. Requesting: ${voice}`);
-    
-    const payload = {
-        user: 4,
-        request: [`${voice}: ${text}`]
-    };
+    return new Promise((resolve, reject) => {
+        const wsUrl = url.replace(/^http/, 'ws');
+        const ws = new WebSocket(wsUrl);
+        const timeout = setTimeout(() => {
+            ws.terminate();
+            reject(new Error("STAR WebSocket timed out (10s)"));
+        }, 10000);
 
-    try {
-        const response = await axios({
-            method: 'post',
-            url: url,
-            data: payload,
-            responseType: 'stream',
-            timeout: 10000
+        ws.on('open', () => {
+            console.log(`[STAR Debug] Connected to ${wsUrl}. Requesting voice: ${voice}`);
+            const payload = {
+                user: 4,
+                request: [`${voice}: ${text}`]
+            };
+            ws.send(JSON.stringify(payload));
         });
 
-        // Some STAR servers send binary directly via HTTP POST response
-        return response.data;
-    } catch (error) {
-        console.error(`[STAR HTTP Error] ${error.message}`);
-        // Fallback to GET if POST fails (common for some STAR setups)
-        try {
-            const getUrl = `${url.replace(/\/$/, '')}/api/tts?voice=${encodeURIComponent(voice)}&text=${encodeURIComponent(text)}`;
-            console.log(`[STAR HTTP] Retrying with GET: ${getUrl}`);
-            const retryResponse = await axios.get(getUrl, { responseType: 'stream', timeout: 5000 });
-            return retryResponse.data;
-        } catch (e) {
-            throw new Error(`STAR HTTP Request failed: ${error.message}`);
-        }
-    }
+        ws.on('message', (data, isBinary) => {
+            if (isBinary) {
+                clearTimeout(timeout);
+                try {
+                    const idLen = data.readUInt16LE(0);
+                    const audioData = data.subarray(2 + idLen);
+                    resolve(Readable.from(audioData));
+                    ws.close();
+                } catch (e) {
+                    reject(new Error(`Failed to parse STAR audio packet: ${e.message}`));
+                    ws.close();
+                }
+            } else {
+                const textMsg = data.toString();
+                if (textMsg.toLowerCase().includes('error') || textMsg.toLowerCase().includes('not found')) {
+                    clearTimeout(timeout);
+                    reject(new Error(`STAR Server Error: ${textMsg}`));
+                    ws.close();
+                }
+            }
+        });
+
+        ws.on('error', (err) => {
+            clearTimeout(timeout);
+            reject(new Error(`STAR WebSocket Error: ${err.message}`));
+        });
+
+        ws.on('close', () => {
+            clearTimeout(timeout);
+        });
+    });
 }
 
 async function getAudioStream(text, provider, voiceKey) {
     const cleanProvider = ultimateClean(provider).toLowerCase();
     const cleanVoiceKey = ultimateClean(voiceKey);
     const sanitizedText = text.replace(/\s+/g, ' ').trim();
+
+    console.log(`[TTS Provider] Requesting stream. Provider: ${cleanProvider}, Voice: ${cleanVoiceKey}, Text: "${sanitizedText.substring(0, 50)}..."`);
 
     // SSML Detection
     const ssmlTags = ['<speak', '<prosody', '<break', '<say-as', '<phoneme', '<emphasis', '<p>', '<s>', '<sub', '<mark', '<audio'];
@@ -187,16 +181,16 @@ async function getAudioStream(text, provider, voiceKey) {
                 host: voiceConfig.host || 'https://translate.google.com',
             });
             const response = await axios.get(url, { responseType: 'stream' });
-            return normalizeToPcm(response.data);
+            return normalizeStream(response.data);
 
         } else if (cleanProvider === 'google-cloud') {
             let voice = cleanVoiceKey || 'en-US-Neural2-A';
             if (voice === 'studio') voice = 'en-US-Studio-O';
             if (voice === 'sulafat') voice = 'en-US-Chirp3-HD-Sulafat';
             if (voice === 'achernar') voice = 'en-US-Chirp3-HD-Achernar';
-            const namedChirps = ['aoede', 'charon', 'fenrir', 'kore', 'leda', 'orus', 'puck', 'zephyr'];
+            const namedChirps = ['aoede', 'charon', 'fenrir', 'kore', 'leda', 'orus', 'puck', 'zephyr'];        
             if (namedChirps.includes(voice.toLowerCase())) {
-                voice = `en-US-Chirp3-HD-${voice.charAt(0).toUpperCase() + voice.slice(1).toLowerCase()}`;
+                voice = `en-US-Chirp3-HD-${voice.charAt(0).toUpperCase() + voice.slice(1).toLowerCase()}`;      
             }
 
             let langCode = 'en-US';
@@ -208,10 +202,20 @@ async function getAudioStream(text, provider, voiceKey) {
                 voice: { name: voice, languageCode: langCode },
                 audioConfig: { audioEncoding: 'LINEAR16', sampleRateHertz: 48000 },
             });
-            return normalizeToPcm(response.audioContent, ['-f', 's16le', '-ar', '48000', '-ac', '1']);
+
+            const ffmpeg = spawn('ffmpeg', ['-i', 'pipe:0', '-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1']);
+            ffmpeg.stdin.write(response.audioContent);
+            ffmpeg.stdin.end();
+            return ffmpeg.stdout;
 
         } else if (cleanProvider === 'polly') {
-            const pollyClient = new PollyClient({ region: process.env.AWS_REGION || "us-east-1" });
+            const pollyClient = new PollyClient({
+                region: process.env.AWS_REGION || "us-east-1",
+                ...(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && {
+                    credentials: { accessKeyId: process.env.AWS_ACCESS_KEY_ID, secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY }
+                })
+            });
+
             const voiceOptions = require('./voiceConstants');
             const voiceConfig = voiceOptions[cleanVoiceKey] || voiceOptions['polly-neural-Matthew'];
 
@@ -223,9 +227,13 @@ async function getAudioStream(text, provider, voiceKey) {
                 VoiceId: voiceConfig.voiceId || "Matthew",
                 SampleRate: "24000"
             }));
-            
+
             const audioArray = await response.AudioStream.transformToByteArray();
-            return normalizeToPcm(Buffer.from(audioArray));
+            const buffer = Buffer.from(audioArray);
+            const ffmpeg = spawn('ffmpeg', ['-i', 'pipe:0', '-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1']);
+            ffmpeg.stdin.write(buffer);
+            ffmpeg.stdin.end();
+            return ffmpeg.stdout;
 
         } else if (cleanProvider === 'gemini') {
             let voiceName = cleanVoiceKey.includes('-') && !cleanVoiceKey.startsWith('en-') ? cleanVoiceKey.split('-')[1] : cleanVoiceKey;
@@ -236,37 +244,36 @@ async function getAudioStream(text, provider, voiceKey) {
 
             const audioPart = result.response.candidates[0].content.parts.find(p => p.inlineData && p.inlineData.mimeType.startsWith("audio/"));
             const buffer = Buffer.from(audioPart.inlineData.data, 'base64');
-            return normalizeToPcm(buffer);
+            const inputArgs = (audioPart.inlineData.mimeType.includes('pcm')) ? ['-f', 's16le', '-ar', '24000', '-ac', '1'] : [];
+            const ffmpeg = spawn('ffmpeg', [...inputArgs, '-i', 'pipe:0', '-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1']);
+            ffmpeg.stdin.write(buffer);
+            ffmpeg.stdin.end();
+            return ffmpeg.stdout;
 
         } else if (cleanProvider === 'piper') {
             const modelPath = path.isAbsolute(cleanVoiceKey) ? cleanVoiceKey : path.resolve(__dirname, '..', cleanVoiceKey);
-            const piper = spawn(resolvePath('piper'), ['--model', modelPath, '--output_file', '-']);
-            piper.stdin.write(sanitizedText + '\n');
-            piper.stdin.end();
-            return normalizeToPcm(piper.stdout);
+            const piperProcess = spawn(resolvePath('piper'), ['--model', modelPath, '--output_file', '-']);
+            piperProcess.stdin.write(sanitizedText + '\n');
+            piperProcess.stdin.end();
+            return normalizeStream(piperProcess.stdout);
 
         } else if (cleanProvider === 'espeak') {
             const child = exec(`printf "${sanitizedText.replace(/"/g, '\"')}" | "${resolvePath('espeak-ng')}" -v ${cleanVoiceKey || 'en-us'} --stdout`, { encoding: 'buffer' });
-            return normalizeToPcm(child.stdout);
+            return normalizeStream(child.stdout);
 
         } else if (cleanProvider === 'rhvoice') {
             const child = exec(`printf "${sanitizedText.replace(/"/g, '\"')}" | "${resolvePath('RHVoice-test')}" -p ${cleanVoiceKey || 'alan'} -o -`, { encoding: 'buffer' });
-            return normalizeToPcm(child.stdout);
+            return normalizeStream(child.stdout);
 
         } else if (cleanProvider === 'star') {
-            let url = "https://speech.seedy.cc";
-            let voice = "default";
-            try {
-                const config = JSON.parse(voiceKey);
-                url = config.url;
-                voice = config.voice || 'default';
-            } catch (e) {}
-
-            const starStream = await getStarAudioStream(sanitizedText, url, voice);
-            return normalizeToPcm(starStream);
+            let config = {};
+            try { config = JSON.parse(voiceKey); } catch (e) { throw new Error("STAR configuration invalid."); }
+            const effectiveVoice = config.voice || 'default';
+            const starStream = await getStarAudioStream(sanitizedText, config.url, effectiveVoice);
+            return normalizeStream(starStream);
         }
         throw new Error("Unknown provider");
-    } catch (e) { console.error(`[TTS Provider] Error in ${cleanProvider}: ${e.message}`); throw e; }
+    } catch (error) { console.error(`[TTS Provider] ${error.message}`); throw error; }
 }
 
 async function getAudioResource(text, provider, voiceKey) {
