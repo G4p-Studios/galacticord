@@ -92,8 +92,6 @@ function normalizeToPcm(input, extraInputArgs = []) {
     outputStream.on('error', () => {});
 
     const ffmpeg = spawn('ffmpeg', [
-        '-fflags', 'nobuffer',
-        ...extraInputArgs,
         '-i', 'pipe:0',
         '-f', 's16le',
         '-ar', '48000',
@@ -130,68 +128,40 @@ function normalizeToPcm(input, extraInputArgs = []) {
     return outputStream;
 }
 
+/**
+ * Reverted back to HTTP/HTTPS for STAR as requested.
+ */
 async function getStarAudioStream(text, url, voice) {
-    const output = new PassThrough();
-    output.on('error', () => {}); 
-
-    const wsUrl = url.replace(/^http/, 'ws');
-    const ws = new WebSocket(wsUrl);
+    console.log(`[STAR HTTP] Connecting to ${url}. Requesting: ${voice}`);
     
-    let inactivityTimer = null;
-
-    const resetInactivityTimer = () => {
-        if (inactivityTimer) clearTimeout(inactivityTimer);
-        inactivityTimer = setTimeout(() => {
-            console.log(`[STAR] Stream inactive for 2s. Finalizing.`);
-            output.end();
-            ws.close();
-        }, 2000);
+    const payload = {
+        user: 4,
+        request: [`${voice}: ${text}`]
     };
 
-    const safetyTimeout = setTimeout(() => {
-        console.log(`[STAR] Safety timeout (15s). Closing.`);
-        output.end();
-        ws.terminate();
-    }, 15000);
+    try {
+        const response = await axios({
+            method: 'post',
+            url: url,
+            data: payload,
+            responseType: 'stream',
+            timeout: 10000
+        });
 
-    ws.on('open', () => {
-        console.log(`[STAR WS] Connected to ${wsUrl}. Streaming: ${voice}`);
-        ws.send(JSON.stringify({ user: 4, request: [`${voice}: ${text}`] }));
-        resetInactivityTimer();
-    });
-
-    ws.on('message', (data, isBinary) => {
-        resetInactivityTimer();
-        if (isBinary) {
-            try {
-                const idLen = data.readUInt16LE(0);
-                const audioData = data.subarray(2 + idLen);
-                if (output.writable) output.write(audioData);
-            } catch (e) { console.error(`[STAR Debug] Packet Error: ${e.message}`); }
-        } else {
-            const msg = data.toString();
-            console.log(`[STAR Text] ${msg}`); // Log all text markers for debugging
-            if (msg.includes('"status"') || msg.includes('"done"') || msg.includes('"abort":true')) {
-                console.log(`[STAR WS] Server marked as finished.`);
-                clearTimeout(inactivityTimer);
-                output.end();
-                ws.close();
-            }
+        // Some STAR servers send binary directly via HTTP POST response
+        return response.data;
+    } catch (error) {
+        console.error(`[STAR HTTP Error] ${error.message}`);
+        // Fallback to GET if POST fails (common for some STAR setups)
+        try {
+            const getUrl = `${url.replace(/\/$/, '')}/api/tts?voice=${encodeURIComponent(voice)}&text=${encodeURIComponent(text)}`;
+            console.log(`[STAR HTTP] Retrying with GET: ${getUrl}`);
+            const retryResponse = await axios.get(getUrl, { responseType: 'stream', timeout: 5000 });
+            return retryResponse.data;
+        } catch (e) {
+            throw new Error(`STAR HTTP Request failed: ${error.message}`);
         }
-    });
-
-    ws.on('error', (err) => { 
-        console.error(`[STAR WS Error] ${err.message}`);
-        output.end(); 
-    });
-
-    ws.on('close', () => {
-        clearTimeout(safetyTimeout);
-        if (inactivityTimer) clearTimeout(inactivityTimer);
-        output.end();
-    });
-
-    return output;
+    }
 }
 
 async function getAudioStream(text, provider, voiceKey) {
