@@ -31,7 +31,6 @@ function createRadioResource(resourceUrl) {
 
     curl.stdout.pipe(ffmpeg.stdin);
     
-    // Safety
     ffmpeg.stdin.on('error', () => {});
     ffmpeg.stdout.on('error', () => {});
     curl.stdout.on('error', () => {});
@@ -80,6 +79,7 @@ function createMixedResource(filePath, seekSeconds, ttsStream, duckVolume) {
 
 function initGuildData(guildId) {
     if (!guildQueues.has(guildId)) {
+        console.log(`[AudioQueue] Initializing player for guild ${guildId}`);
         const player = createAudioPlayer();
         const guildData = {
             player,
@@ -116,14 +116,15 @@ function initGuildData(guildId) {
             }
 
             if (currentData.queue.length > 0) {
+                console.log(`[AudioQueue] Playing next TTS for ${guildId} (${currentData.queue.length} left)`);
                 const nextItem = currentData.queue.shift();
                 currentData.isPlayingTTS = true;
                 
-                // Start a watchdog: If TTS takes more than 20 seconds, skip it
+                // Watchdog: If nothing happens for 15s, skip
                 currentData.watchdog = setTimeout(() => {
                     console.log(`[AudioQueue] Watchdog triggered for ${guildId}. Skipping stuck TTS.`);
-                    player.stop(); // This will trigger Idle event
-                }, 20000);
+                    player.stop();
+                }, 15000);
 
                 player.play(createAudioResource(nextItem, { inputType: StreamType.Raw }));
             } else {
@@ -155,9 +156,12 @@ function initGuildData(guildId) {
             }
         });
 
+        player.on(AudioPlayerStatus.Playing, () => {
+            console.log(`[AudioQueue] Player is now PLAYING in ${guildId}`);
+        });
+
         player.on('error', error => {
             console.error(`[AudioQueue Error] ${guildId}:`, error.message);
-            // On error, try to move to next item
             player.stop();
         });
     }
@@ -187,8 +191,7 @@ function addToQueue(guildId, ttsStream, connection) {
     const guildData = initGuildData(guildId);
     connection.subscribe(guildData.player);
 
-    // Safety: ensure errors on the ttsStream don't crash us
-    ttsStream.on('error', (e) => console.error(`[AudioQueue] Stream Error in Queue: ${e.message}`));
+    ttsStream.on('error', (e) => console.error(`[AudioQueue] TTS Stream Error: ${e.message}`));
 
     if (guildData.isPlayingSoundFile) {
         guildData.soundFileElapsed += (Date.now() - guildData.soundFilePlaybackStart) / 1000;
@@ -200,27 +203,25 @@ function addToQueue(guildId, ttsStream, connection) {
             if (config[guildId]?.duckingVolume !== undefined) duckVolume = config[guildId].duckingVolume;
         } catch (e) {}
         
-        // Start watchdog for mixed resource
         if (guildData.watchdog) clearTimeout(guildData.watchdog);
         guildData.watchdog = setTimeout(() => {
             console.log(`[AudioQueue] Watchdog triggered for ${guildId} (Mixed).`);
             guildData.player.stop();
-        }, 20000);
+        }, 15000);
 
         guildData.player.play(createMixedResource(guildData.soundFilePath, guildData.soundFileElapsed, ttsStream, duckVolume));
     } else if (guildData.isPlayingTTS) {
         guildData.queue.push(ttsStream);
-        console.log(`[AudioQueue] TTS added to queue (Position: ${guildData.queue.length}).`);
+        console.log(`[AudioQueue] TTS added to queue (Guild: ${guildId}, Pos: ${guildData.queue.length}).`);
     } else {
-        console.log(`[AudioQueue] Playing TTS immediately.`);
+        console.log(`[AudioQueue] Interrupting for immediate TTS in ${guildId}`);
         guildData.isPlayingTTS = true;
         
-        // Start watchdog
         if (guildData.watchdog) clearTimeout(guildData.watchdog);
         guildData.watchdog = setTimeout(() => {
             console.log(`[AudioQueue] Watchdog triggered for ${guildId} (Immediate).`);
             guildData.player.stop();
-        }, 20000);
+        }, 15000);
 
         guildData.player.play(createAudioResource(ttsStream, { inputType: StreamType.Raw }));
     }
@@ -229,14 +230,11 @@ function addToQueue(guildId, ttsStream, connection) {
 function playSoundFile(guildId, filePath, connection) {
     const guildData = initGuildData(guildId);
     connection.subscribe(guildData.player);
-
     if (guildData.soundFilePath) fs.unlink(guildData.soundFilePath, () => {});
-
     guildData.soundFilePath = filePath;
     guildData.soundFileElapsed = 0;
     guildData.soundFilePlaybackStart = Date.now();
     guildData.isPlayingSoundFile = true;
-
     if (guildData.isPlayingTTS) return;
     guildData.player.play(createSoundFileResource(filePath, 0));
 }
@@ -246,14 +244,10 @@ function silenceAll(guildId) {
     if (!guildData) return;
     guildData.backgroundUrl = null;
     guildData.resumeCallback = null;
-    for (const stream of guildData.queue) {
-        stream.destroy();
-    }
+    for (const stream of guildData.queue) { stream.destroy(); }
     guildData.queue.length = 0;
     guildData.isPlayingTTS = false;
-    if (guildData.isPlayingSoundFile && guildData.soundFilePath) {
-        fs.unlink(guildData.soundFilePath, () => {});
-    }
+    if (guildData.isPlayingSoundFile && guildData.soundFilePath) { fs.unlink(guildData.soundFilePath, () => {}); }
     guildData.isPlayingSoundFile = false;
     guildData.soundFilePath = null;
     guildData.player.stop();
