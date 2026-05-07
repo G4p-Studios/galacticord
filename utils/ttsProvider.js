@@ -5,17 +5,15 @@ const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
 const WebSocket = require('ws');
-const { Readable } = require('stream');
+const { Readable, PassThrough } = require('stream');
 const textToSpeech = require('@google-cloud/text-to-speech');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { PollyClient, SynthesizeSpeechCommand, DescribeVoicesCommand } = require("@aws-sdk/client-polly");
 
-// Initialize Google Cloud TTS Client with API Key from .env
+// Initialize Clients
 const gCloudClient = new textToSpeech.TextToSpeechClient({
     apiKey: process.env.GOOGLE_CLOUD_API_KEY
 });
-
-// Initialize Gemini AI for TTS
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-tts" });
 
@@ -42,41 +40,30 @@ async function init() {
 
             if (voices.length > 0) {
                 const voiceOptions = require('./voiceConstants');
-                // Clear existing static polly voices to prevent duplicates
                 for (const key in voiceOptions) {
-                    if (voiceOptions[key] && voiceOptions[key].polly) {
-                        delete voiceOptions[key];
-                    }
+                    if (voiceOptions[key] && voiceOptions[key].polly) delete voiceOptions[key];
                 }
                 
-                // Add dynamically fetched voices to memory for Autocomplete
-                let addedCount = 0;
                 for (const voice of voices) {
                     if (!voice.SupportedEngines) continue;
                     for (const engine of voice.SupportedEngines) {
                         const key = `polly-${engine}-${voice.Id}`;
-                        const engineLabel = engine.charAt(0).toUpperCase() + engine.slice(1);
                         voiceOptions[key] = {
-                            label: `Amazon Polly - ${voice.Id} (${engineLabel}, ${voice.Gender}, ${voice.LanguageCode})`,
-                            polly: true,
-                            engine: engine,
-                            voiceId: voice.Id
+                            label: `Amazon Polly - ${voice.Id} (${engine.charAt(0).toUpperCase() + engine.slice(1)}, ${voice.Gender})`,
+                            polly: true, engine, voiceId: voice.Id
                         };
-                        addedCount++;
                     }
                 }
-                console.log(`[Amazon Polly] Success! Dynamically cached ${voices.length} voices (${addedCount} total engine variants).`);
+                console.log(`[Amazon Polly] Dynamically cached ${voices.length} voices.`);
             }
         }
     } catch (e) {
-        console.error("[Amazon Polly] Failed to fetch voices dynamically (falling back to static list):", e.message);
+        console.error("[Amazon Polly] Failed to fetch voices dynamically:", e.message);
     }
-} 
+}
+
 function getEdgeVoices() { return []; }
 
-/**
- * Aggressively normalizes strings to standard ASCII hyphens.
- */
 function ultimateClean(str) {
     if (typeof str !== 'string') return str;
     return str.replace(/[‐‑‒–—―−⁃]/g, '-').trim();
@@ -97,75 +84,10 @@ function resolvePath(command) {
     }
 }
 
-async function getStarAudioStream(text, url, voice) {
-    const { PassThrough } = require('stream');
-    const stream = new PassThrough();
-    
-    const wsUrl = url.replace(/^http/, 'ws');
-    const ws = new WebSocket(wsUrl);
-    
-    let hasSentResolve = false;
-
-    const timeout = setTimeout(() => {
-        ws.terminate();
-        if (!hasSentResolve) {
-            stream.destroy(new Error("STAR WebSocket timed out (10s)"));
-        }
-    }, 10000);
-
-    ws.on('open', () => {
-        console.log(`[STAR Debug] Connected to ${wsUrl}. Streaming voice: ${voice}`);
-        // STAR Protocol: {"user": 4, "request": ["Voice: Text"]}
-        const payload = {
-            user: 4, 
-            request: [`${voice}: ${text}`]
-        };
-        ws.send(JSON.stringify(payload));
-    });
-
-    ws.on('message', (data, isBinary) => {
-        if (isBinary) {
-            clearTimeout(timeout);
-            try {
-                // Protocol: 2 byte little-endian length + metadata/ID + audio
-                const idLen = data.readUInt16LE(0);
-                const audioData = data.subarray(2 + idLen);
-                
-                // Write the chunk to the stream immediately
-                stream.write(audioData);
-                
-                if (!hasSentResolve) {
-                    hasSentResolve = true;
-                }
-            } catch (e) {
-                console.error(`[STAR Debug] Packet Error: ${e.message}`);
-            }
-        } else {
-            const textMsg = data.toString();
-            // End of stream marker usually looks like {"status": "done"} or similar
-            if (textMsg.includes('"status"') || textMsg.includes('"done"')) {
-                stream.end();
-                ws.close();
-            }
-        }
-    });
-
-    ws.on('error', (err) => {
-        clearTimeout(timeout);
-        stream.destroy(err);
-    });
-
-    ws.on('close', () => {
-        stream.end();
-    });
-
-    return stream;
-}
-
 /**
- * Normalizes any audio stream to s16le stereo 48k PCM for Discord.
+ * Normalizes any audio stream/buffer to s16le stereo 48k PCM for Discord.
  */
-function normalizeStream(stream) {
+function normalizeToPcm(input) {
     const ffmpeg = spawn('ffmpeg', [
         '-i', 'pipe:0',
         '-f', 's16le',
@@ -173,12 +95,56 @@ function normalizeStream(stream) {
         '-ac', '2',
         'pipe:1'
     ]);
-    stream.on('error', () => {});
+
+    // Handle standard stream errors to prevent crashes
     ffmpeg.stdin.on('error', () => {});
     ffmpeg.stdout.on('error', () => {});
+    ffmpeg.stderr.on('error', () => {});
     ffmpeg.on('error', () => {});
-    stream.pipe(ffmpeg.stdin);
+
+    if (Buffer.isBuffer(input)) {
+        ffmpeg.stdin.write(input);
+        ffmpeg.stdin.end();
+    } else if (input && typeof input.pipe === 'function') {
+        input.pipe(ffmpeg.stdin);
+    }
+
     return ffmpeg.stdout;
+}
+
+async function getStarAudioStream(text, url, voice) {
+    const output = new PassThrough();
+    const wsUrl = url.replace(/^http/, 'ws');
+    const ws = new WebSocket(wsUrl);
+    
+    const timeout = setTimeout(() => {
+        ws.terminate();
+        output.destroy(new Error("STAR WebSocket timed out (10s)"));
+    }, 10000);
+
+    ws.on('open', () => {
+        console.log(`[STAR Debug] Connected to ${wsUrl}. Streaming: ${voice}`);
+        ws.send(JSON.stringify({ user: 4, request: [`${voice}: ${text}`] }));
+    });
+
+    ws.on('message', (data, isBinary) => {
+        if (isBinary) {
+            clearTimeout(timeout);
+            try {
+                const idLen = data.readUInt16LE(0);
+                const audioData = data.subarray(2 + idLen);
+                output.write(audioData);
+            } catch (e) { console.error(`[STAR Debug] Packet Error: ${e.message}`); }
+        } else if (data.toString().includes('"status"') || data.toString().includes('"done"')) {
+            output.end();
+            ws.close();
+        }
+    });
+
+    ws.on('error', (err) => { clearTimeout(timeout); output.destroy(err); });
+    ws.on('close', () => output.end());
+
+    return output;
 }
 
 async function getAudioStream(text, provider, voiceKey) {
@@ -186,13 +152,11 @@ async function getAudioStream(text, provider, voiceKey) {
     const cleanVoiceKey = ultimateClean(voiceKey);
     const sanitizedText = text.replace(/\s+/g, ' ').trim();
 
-    console.log(`[TTS Provider] Requesting stream. Provider: ${cleanProvider}, Voice: ${cleanVoiceKey}, Text: "${sanitizedText.substring(0, 50)}..."`);
-
     // SSML Detection
-    const ssmlTags = ['<speak', '<prosody', '<break', '<say-as', '<phoneme', '<emphasis', '<p>', '<s>', '<sub', '<mark', '<audio', '<amazon:'];
+    const ssmlTags = ['<speak', '<prosody', '<break', '<say-as', '<phoneme', '<emphasis', '<p>', '<s>', '<sub', '<mark', '<audio'];
     const isSSML = ssmlTags.some(tag => sanitizedText.toLowerCase().includes(tag));
     let finalText = sanitizedText;
-    if (isSSML && !finalText.toLowerCase().trim().startsWith('<speak>') && !finalText.toLowerCase().trim().startsWith('<amazon:')) {
+    if (isSSML && !finalText.toLowerCase().trim().startsWith('<speak>')) {
         finalText = `<speak>${finalText}</speak>`;
     }
 
@@ -206,234 +170,92 @@ async function getAudioStream(text, provider, voiceKey) {
                 host: voiceConfig.host || 'https://translate.google.com',
             });
             const response = await axios.get(url, { responseType: 'stream' });
-            return normalizeStream(response.data);
+            return normalizeToPcm(response.data);
 
         } else if (cleanProvider === 'google-cloud') {
-            console.log(`[Google Cloud TTS] Provider: ${cleanProvider}, Voice: ${cleanVoiceKey}`);
-            
             let voice = cleanVoiceKey || 'en-US-Neural2-A';
-            
-            // Handle legacy short names / fallback mappings
             if (voice === 'studio') voice = 'en-US-Studio-O';
             if (voice === 'sulafat') voice = 'en-US-Chirp3-HD-Sulafat';
             if (voice === 'achernar') voice = 'en-US-Chirp3-HD-Achernar';
-            
             const namedChirps = ['aoede', 'charon', 'fenrir', 'kore', 'leda', 'orus', 'puck', 'zephyr'];
             if (namedChirps.includes(voice.toLowerCase())) {
                 voice = `en-US-Chirp3-HD-${voice.charAt(0).toUpperCase() + voice.slice(1).toLowerCase()}`;
             }
 
-            // Dynamically determine language code
             let langCode = 'en-US';
             const localeMatch = voice.match(/^([a-z]{2}-[A-Z]{2})/);
             if (localeMatch) langCode = localeMatch[1];
 
-            console.log(`[Google Cloud TTS] Synthesizing PCM with voice: ${voice} (${langCode})...`);
-            const request = {
+            const [response] = await gCloudClient.synthesizeSpeech({
                 input: isSSML ? { ssml: finalText } : { text: sanitizedText },
                 voice: { name: voice, languageCode: langCode },
                 audioConfig: { audioEncoding: 'LINEAR16', sampleRateHertz: 48000 },
-            };
-
-            const [response] = await gCloudClient.synthesizeSpeech(request);            console.log(`[Google Cloud TTS] Synthesis successful. Audio size: ${response.audioContent.length} bytes`);
-
-            // For Buffer input, we spawn specifically
-            const ffmpeg = spawn('ffmpeg', [
-                '-i', 'pipe:0',
-                '-f', 's16le',
-                '-ar', '48000',
-                '-ac', '2',
-                'pipe:1'
-            ]);
-            ffmpeg.stdin.on('error', () => {});
-            ffmpeg.stdout.on('error', () => {});
-            ffmpeg.on('error', () => {});
-            ffmpeg.stdin.write(response.audioContent);
-            ffmpeg.stdin.end();
-            return ffmpeg.stdout;
+            });
+            return normalizeToPcm(response.audioContent);
 
         } else if (cleanProvider === 'polly') {
-            console.log(`[Amazon Polly] Synthesizing... VoiceKey: ${cleanVoiceKey}`);
-            
-            const pollyClient = new PollyClient({
-                region: process.env.AWS_REGION || "us-east-1",
-                ...(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && {
-                    credentials: {
-                        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-                        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
-                    }
-                })
-            });
-
+            const pollyClient = new PollyClient({ region: process.env.AWS_REGION || "us-east-1" });
             const voiceOptions = require('./voiceConstants');
             const voiceConfig = voiceOptions[cleanVoiceKey] || voiceOptions['polly-neural-Matthew'];
 
-            const command = new SynthesizeSpeechCommand({
+            const response = await pollyClient.send(new SynthesizeSpeechCommand({
                 Engine: voiceConfig.engine || 'neural',
-                Text: isSSML ? finalText.substring(0, 3000) : sanitizedText.substring(0, 3000), // Polly max length
+                Text: isSSML ? finalText.substring(0, 3000) : sanitizedText.substring(0, 3000),
                 TextType: isSSML ? "ssml" : "text",
                 OutputFormat: "mp3",
                 VoiceId: voiceConfig.voiceId || "Matthew",
                 SampleRate: "24000"
-            });
-
-            const response = await pollyClient.send(command);
+            }));
             
-            // v3 stream extraction
             const audioArray = await response.AudioStream.transformToByteArray();
-            const buffer = Buffer.from(audioArray);
-            
-            console.log(`[Amazon Polly] Success. Audio size: ${buffer.length} bytes`);
-
-            const ffmpeg = spawn('ffmpeg', [
-                '-i', 'pipe:0',
-                '-f', 's16le',
-                '-ar', '48000',
-                '-ac', '2',
-                'pipe:1'
-            ]);
-
-            ffmpeg.stdin.on('error', () => {});
-            ffmpeg.stdout.on('error', () => {});
-            ffmpeg.on('error', () => {});
-            ffmpeg.stdin.write(buffer);
-            ffmpeg.stdin.end();
-            return ffmpeg.stdout;
+            return normalizeToPcm(Buffer.from(audioArray));
 
         } else if (cleanProvider === 'gemini') {
-            console.log(`[Gemini TTS] Synthesizing... Voice: ${cleanVoiceKey}`);
-            
-            // Extract voice name from key (e.g. gemini-Aoede -> Aoede) or use as is
-            let voiceName = cleanVoiceKey.includes('-') && !cleanVoiceKey.startsWith('en-') 
-                ? cleanVoiceKey.split('-')[1] 
-                : cleanVoiceKey;
-
+            let voiceName = cleanVoiceKey.includes('-') && !cleanVoiceKey.startsWith('en-') ? cleanVoiceKey.split('-')[1] : cleanVoiceKey;
             const result = await geminiModel.generateContent({
                 contents: [{ role: 'user', parts: [{ text: sanitizedText }] }],
-                generationConfig: {
-                    responseModalities: ["AUDIO"],
-                    speechConfig: {
-                        voiceConfig: {
-                            prebuiltVoiceConfig: {
-                                voiceName: voiceName
-                            }
-                        }
-                    }
-                }
+                generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } }
             });
 
-            // Safety Check: Ensure response has candidates and content
-            if (!result.response || !result.response.candidates || result.response.candidates.length === 0) {
-                console.error("[Gemini TTS] Empty response or no candidates:", JSON.stringify(result.response, null, 2));
-                throw new Error("Gemini TTS returned no audio candidates. (Possibly blocked by safety filters)");
-            }
-
-            const candidate = result.response.candidates[0];
-            if (!candidate.content || !candidate.content.parts) {
-                console.error("[Gemini TTS] Candidate missing content/parts. FinishReason:", candidate.finishReason);
-                console.error("Full Response:", JSON.stringify(result.response, null, 2));
-                throw new Error(`Gemini TTS failed to generate content. Reason: ${candidate.finishReason || 'Unknown'}`);
-            }
-
-            // Extract audio part using the old bot's exact logic
-            const audioPart = candidate.content.parts.find(p => p.inlineData && p.inlineData.mimeType.startsWith("audio/"));
-            
-            if (!audioPart || !audioPart.inlineData || !audioPart.inlineData.data) {
-                console.error("[Gemini TTS] No audio data in response:", JSON.stringify(result.response, null, 2));
-                throw new Error("Gemini TTS did not return audio data.");
-            }
-
-            console.log(`[Gemini TTS] Received MIME Type: ${audioPart.inlineData.mimeType}`);
+            const audioPart = result.response.candidates[0].content.parts.find(p => p.inlineData && p.inlineData.mimeType.startsWith("audio/"));
             const buffer = Buffer.from(audioPart.inlineData.data, 'base64');
-            console.log(`[Gemini TTS] Success. Audio size: ${buffer.length} bytes`);
-
-            // Normalize to s16le stereo 48k via FFmpeg
-            // If the mimeType is raw audio (e.g. audio/pcm or similar), we MUST specify input format
-            const inputArgs = (audioPart.inlineData.mimeType.includes('pcm') || audioPart.inlineData.mimeType === 'audio/l16') 
-                ? ['-f', 's16le', '-ar', '24000', '-ac', '1'] 
-                : [];
-
-            const ffmpeg = spawn('ffmpeg', [
-                ...inputArgs,
-                '-i', 'pipe:0',
-                '-f', 's16le',
-                '-ar', '48000',
-                '-ac', '2',
-                'pipe:1'
-            ]);
-
-            ffmpeg.stderr.on('data', (data) => {
-                const msg = data.toString();
-                if (msg.includes('Error') || msg.includes('Invalid')) {
-                    console.error(`[Gemini FFmpeg Debug] ${msg}`);
-                }
-            });
-
-            ffmpeg.stdin.on('error', () => {});
-            ffmpeg.stdout.on('error', () => {});
-            ffmpeg.on('error', () => {});
+            
+            // Gemini usually returns 24k mono PCM
+            const inputArgs = (audioPart.inlineData.mimeType.includes('pcm')) ? ['-f', 's16le', '-ar', '24000', '-ac', '1'] : [];
+            const ffmpeg = spawn('ffmpeg', [...inputArgs, '-i', 'pipe:0', '-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1']);
             ffmpeg.stdin.write(buffer);
             ffmpeg.stdin.end();
             return ffmpeg.stdout;
 
         } else if (cleanProvider === 'piper') {
-            const piperPath = resolvePath('piper');
-            let v = cleanVoiceKey.endsWith('.onnx') ? cleanVoiceKey : 'models/en_US-amy-medium.onnx';
-            const modelPath = path.isAbsolute(v) ? v : path.resolve(__dirname, '..', v);
-            
-            const piperProcess = spawn(piperPath, ['--model', modelPath, '--output_file', '-']);
-            if (piperProcess.stdin) {
-                piperProcess.stdin.write(sanitizedText + '\n');
-                piperProcess.stdin.end();
-            }
-            return normalizeStream(piperProcess.stdout);
+            const modelPath = path.isAbsolute(cleanVoiceKey) ? cleanVoiceKey : path.resolve(__dirname, '..', cleanVoiceKey);
+            const piper = spawn(resolvePath('piper'), ['--model', modelPath, '--output_file', '-']);
+            piper.stdin.write(sanitizedText + '\n');
+            piper.stdin.end();
+            return normalizeToPcm(piper.stdout);
 
         } else if (cleanProvider === 'espeak') {
-            const espeakPath = resolvePath('espeak-ng');
-            const voice = cleanVoiceKey || 'en-us';
-            const safeText = sanitizedText.replace(/"/g, '\"');
-            const command = `printf "${safeText}" | "${espeakPath}" -v ${voice} --stdout`;
-            
-            const child = exec(command, { encoding: 'buffer', maxBuffer: 10 * 1024 * 1024 });
-            return normalizeStream(child.stdout);
+            const child = exec(`printf "${sanitizedText.replace(/"/g, '\"')}" | "${resolvePath('espeak-ng')}" -v ${cleanVoiceKey || 'en-us'} --stdout`, { encoding: 'buffer' });
+            return normalizeToPcm(child.stdout);
 
         } else if (cleanProvider === 'rhvoice') {
-            const rhvoicePath = resolvePath('RHVoice-test');
-            const voice = cleanVoiceKey || 'alan';
-            const safeText = sanitizedText.replace(/"/g, '\"');
-            const command = `printf "${safeText}" | "${rhvoicePath}" -p ${voice} -o -`;
-
-            const child = exec(command, { encoding: 'buffer', maxBuffer: 10 * 1024 * 1024 });
-            return normalizeStream(child.stdout);
+            const child = exec(`printf "${sanitizedText.replace(/"/g, '\"')}" | "${resolvePath('RHVoice-test')}" -p ${cleanVoiceKey || 'alan'} -o -`, { encoding: 'buffer' });
+            return normalizeToPcm(child.stdout);
 
         } else if (cleanProvider === 'star') {
-            let config = {};
-            try { config = JSON.parse(voiceKey); } catch (e) { throw new Error("STAR configuration invalid."); }
-            if (!config.url) throw new Error("No STAR URL configured.");
-
-            let effectiveVoice = config.voice;
-            if (!effectiveVoice || effectiveVoice === 'onnx' || effectiveVoice === 'undefined') effectiveVoice = 'default';
-
-            const starStream = await getStarAudioStream(sanitizedText, config.url, effectiveVoice);
-            return normalizeStream(starStream);
+            const config = JSON.parse(voiceKey);
+            const starStream = await getStarAudioStream(sanitizedText, config.url, config.voice || 'default');
+            return normalizeToPcm(starStream);
         }
-
         throw new Error("Unknown provider");
-    } catch (error) {
-        console.error(`[TTS Provider] ${error.message}`);
-        throw error;
-    }
+    } catch (e) { console.error(`[TTS Provider] ${e.message}`); throw e; }
 }
 
 async function getAudioResource(text, provider, voiceKey) {
     try {
         const stream = await getAudioStream(text, provider, voiceKey);
-        console.log(`[AudioResource] Stream received, creating resource...`);
         return createAudioResource(stream, { inputType: StreamType.Raw, inlineVolume: true });
-    } catch (error) {
-        console.error(`[AudioResource] Error: ${error.message}`);
-        throw error;
-    }
+    } catch (error) { console.error(`[AudioResource] Error: ${error.message}`); throw error; }
 }
 
 module.exports = { init, getEdgeVoices, getAudioResource, getAudioStream };
