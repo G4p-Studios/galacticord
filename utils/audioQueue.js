@@ -183,4 +183,16 @@ function isGuildPlayingTTS(guildId) {
     return data ? data.isPlayingTTS : false;
 }
 
-module.exports = { addToQueue, setBackground, stopBackground, setMusicResume, getPlayer, getQueueLength, isGuildPlayingTTS };
+function silenceAll(guildId) {
+    const guildData = guildQueues.get(guildId);
+    if (!guildData) return;
+
+    console.log(`[AudioQueue] Silencing all audio for ${guildId}.`);
+    guildData.backgroundUrl = null;
+    guildData.resumeCallback = null;
+    guildData.queue = [];
+    guildData.isPlayingTTS = false;
+    guildData.player.stop();
+}
+
+module.exports = { addToQueue, setBackground, stopBackground, silenceAll, setMusicResume, getPlayer, getQueueLength, isGuildPlayingTTS };
