@@ -79,12 +79,14 @@ module.exports = {
             const ignoreBots = serverConfig.ignoreBots !== undefined ? serverConfig.ignoreBots : true;
 
             // 2. Logic Filters
-            // If ignoreBots is true (default), we skip all bots
-            if (message.author.bot && ignoreBots) return;
-
-            // If ignoreBots is false, we speak other bots AND our own messages
-            // But we must prevent infinite loops if the bot mentions its own TTS text
-            if (message.author.id === message.client.user.id && message.content.includes('says:')) return;
+            if (message.author.id === message.client.user.id) {
+                // The bot always speaks its own messages (confirmations, replies) for accessibility
+                // BUT we must skip the "says:" messages to prevent an infinite loop!
+                if (message.content.includes('says:')) return;
+            } else if (message.author.bot) {
+                // For other bots, we only speak if ignoreBots is false (Bot Speak: ON)
+                if (ignoreBots) return;
+            }
             
             // Only process in the designated TTS channel
             if (ttsChannelId && message.channel.id !== ttsChannelId) return;
