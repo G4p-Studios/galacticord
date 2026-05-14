@@ -200,6 +200,9 @@ module.exports = {
             const presets = [
                 { name: 'Default (speech.seedy.cc)', value: 'https://speech.seedy.cc' },
                 { name: 'Mad Gamer (star.mad-gamer.com)', value: 'https://star.mad-gamer.com' },
+                { name: 'Blindsoft Star (star.blindsoft.net)', value: 'https://star.blindsoft.net' },
+                { name: 'Blindsoft R720 (r720.blindsoft.net)', value: 'https://r720.blindsoft.net' },
+                { name: 'Localhost (Self-hosted)', value: 'http://localhost:7774' },
                 { name: `Other: ${focusedValue}`, value: focusedValue }
             ];
             const filtered = presets.filter(p => p.name.toLowerCase().includes(focusedValue.toLowerCase()) || p.value.toLowerCase().includes(focusedValue.toLowerCase()));
